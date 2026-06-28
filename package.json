@@ -1,0 +1,40 @@
+{
+  "name": "chatgo",
+  "version": "0.3.46",
+  "private": true,
+  "type": "module",
+  "description": "ChatGo - 普适化 AI 聊天站点效率增强的 Chrome 扩展",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@floating-ui/dom": "^1.7.6",
+    "@lucide/vue": "^1.21.0",
+    "dompurify": "^3.4.11",
+    "katex": "^0.16.22",
+    "markdown-it": "^14.2.0",
+    "pinia": "^2.2.6",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^2.0.0-beta.28",
+    "@types/chrome": "^0.0.287",
+    "@types/dompurify": "^3.2.0",
+    "@types/katex": "^0.16.7",
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^26.0.0",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "vue-tsc": "^2.1.10"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "vue-demi"
+    ]
+  }
+}

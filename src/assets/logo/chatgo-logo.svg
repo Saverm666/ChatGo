@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="120 120 260 260" width="500" height="500" role="img" aria-labelledby="title desc">
+  <title id="title">ChatGo Logo</title>
+  <desc id="desc">A clean chat bubble containing message blocks and a check mark.</desc>
+  <path d="M 170,140 H 330 A 30,30 0 0 1 360,170 V 270 A 30,30 0 0 1 330,300 H 220 L 160,350 V 300 A 30,30 0 0 1 140,270 V 170 A 30,30 0 0 1 170,140 Z" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="185" y="185" width="130" height="30" rx="10" fill="#E8F4FF"/>
+  <rect x="185" y="230" width="90" height="30" rx="10" fill="#4BA3FF"/>
+</svg>
