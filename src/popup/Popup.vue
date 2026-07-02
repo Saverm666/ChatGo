@@ -5,6 +5,11 @@ import {
   FORMULA_COPY_FORMAT_LABELS,
   MARKDOWN_FORMULA_WRAP_LABELS
 } from '@/main/constants'
+import {
+  SITE_ACTIVATION_MODE_LABELS,
+  normalizeSiteHostname,
+  sanitizeSiteList
+} from '@/main/site-policy'
 import { copyTextToClipboard, formatTimestamp, truncateText } from '@/main/utils'
 import {
   readSettings,
@@ -88,6 +93,48 @@ async function openOptions(): Promise<void> {
 const sortedPrompts = computed(() =>
   [...prompts.value].sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)))
 )
+const currentHostname = computed(() => {
+  try {
+    return normalizeSiteHostname(new URL(pageUrl.value).hostname)
+  } catch {
+    return ''
+  }
+})
+const whitelistSites = computed(() => sanitizeSiteList(settings.value?.siteWhitelist))
+const blacklistSites = computed(() => sanitizeSiteList(settings.value?.siteBlacklist))
+const currentSiteInWhitelist = computed(() => whitelistSites.value.includes(currentHostname.value))
+const currentSiteInBlacklist = computed(() => blacklistSites.value.includes(currentHostname.value))
+const siteModeOptions = computed(() => {
+  return Object.entries(SITE_ACTIVATION_MODE_LABELS).map(([value, label]) => ({ value, label }))
+})
+const currentSiteStatusText = computed(() => {
+  if (!currentHostname.value) return '无法识别当前站点'
+  if (currentSiteInBlacklist.value) return '当前站点已停用'
+  if (currentSiteInWhitelist.value) return '当前站点已强制启用'
+  return '当前站点跟随默认模式'
+})
+
+async function enableCurrentSite(): Promise<void> {
+  if (!settings.value || !currentHostname.value) return
+  const hostname = currentHostname.value
+  const nextWhitelist = Array.from(new Set([...whitelistSites.value, hostname]))
+  const nextBlacklist = blacklistSites.value.filter((item) => item !== hostname)
+  settings.value.siteWhitelist = nextWhitelist
+  settings.value.siteBlacklist = nextBlacklist
+  await writeSettings({ siteWhitelist: nextWhitelist, siteBlacklist: nextBlacklist })
+  setStatus('已启用当前站点')
+}
+
+async function disableCurrentSite(): Promise<void> {
+  if (!settings.value || !currentHostname.value) return
+  const hostname = currentHostname.value
+  const nextWhitelist = whitelistSites.value.filter((item) => item !== hostname)
+  const nextBlacklist = Array.from(new Set([...blacklistSites.value, hostname]))
+  settings.value.siteWhitelist = nextWhitelist
+  settings.value.siteBlacklist = nextBlacklist
+  await writeSettings({ siteWhitelist: nextWhitelist, siteBlacklist: nextBlacklist })
+  setStatus('已停用当前站点')
+}
 
 onMounted(async () => {
   await Promise.all([loadPageInfo(), loadData()])
@@ -135,6 +182,32 @@ onMounted(async () => {
             { value: 'bare', label: MARKDOWN_FORMULA_WRAP_LABELS.bare }
           ]"
           @update:model-value="update('markdownFormulaWrapMode', $event as ChatGoSettings['markdownFormulaWrapMode'])"
+        />
+      </div>
+
+      <div class="card__divider" />
+
+      <div class="card__section">
+        <p class="card__label">当前站点</p>
+        <div class="site-box">
+          <div>
+            <strong>{{ currentHostname || '未知站点' }}</strong>
+            <span>{{ currentSiteStatusText }}</span>
+          </div>
+          <div class="site-actions">
+            <button type="button" @click="enableCurrentSite">启用</button>
+            <button type="button" class="site-actions__danger" @click="disableCurrentSite">停用</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card__section">
+        <p class="card__label">默认站点模式</p>
+        <RadioRow
+          v-model="settings.siteActivationMode"
+          name="site-mode"
+          :options="siteModeOptions"
+          @update:model-value="update('siteActivationMode', $event as ChatGoSettings['siteActivationMode'])"
         />
       </div>
 
@@ -282,6 +355,49 @@ onMounted(async () => {
   height: 1px;
   background: var(--cg-border);
   margin: 8px 0;
+}
+.site-box {
+  border: 1px solid var(--cg-border);
+  background: var(--cg-bg);
+  border-radius: var(--cg-radius-sm);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.site-box strong {
+  display: block;
+  font-size: 13px;
+  color: var(--cg-text);
+}
+.site-box span {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--cg-text-muted);
+}
+.site-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.site-actions button {
+  border: 1px solid var(--cg-border);
+  background: var(--cg-bg);
+  color: var(--cg-text);
+  border-radius: var(--cg-radius-sm);
+  min-height: 34px;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.site-actions button:hover {
+  border-color: var(--cg-accent);
+  color: var(--cg-accent);
+}
+.site-actions__danger:hover {
+  border-color: #DC2626 !important;
+  color: #DC2626 !important;
 }
 .empty {
   font-size: 13px;

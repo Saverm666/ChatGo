@@ -44,7 +44,7 @@ function applySettings(settings: ChatGoSettings, adapter: SiteAdapter): void {
   // Markdown 复制
   markdownCopy.setFormulaWrapMode(settings.markdownFormulaWrapMode)
   if (settings.markdownCopyEnabled) {
-    markdownCopy.enable()
+    markdownCopy.enable(adapter)
   } else {
     markdownCopy.disable()
   }

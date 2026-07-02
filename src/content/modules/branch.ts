@@ -193,12 +193,17 @@ function formatBranchQuotedMarkdown(markdown: string): string {
 function findComposer(): HTMLElement | null {
   const selector = adapter?.selectors.composer
   if (selector) {
-    const el = document.querySelector(selector)
-    if (el instanceof HTMLElement) return el
+    const candidates = Array.from(document.querySelectorAll(selector))
+    for (const el of candidates) {
+      if (el instanceof HTMLElement && el.getClientRects().length > 0) return el
+    }
   }
   // 通用回退
-  const fallback = document.querySelector('div[contenteditable="true"], textarea')
-  return fallback instanceof HTMLElement ? fallback : null
+  const fallbackCandidates = Array.from(document.querySelectorAll('div[contenteditable="true"], textarea'))
+  for (const el of fallbackCandidates) {
+    if (el instanceof HTMLElement && el.getClientRects().length > 0) return el
+  }
+  return null
 }
 
 function getComposerPlainText(composer: HTMLElement): string {

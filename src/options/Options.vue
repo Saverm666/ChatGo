@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onBeforeUnmount, onMounted } from 'vue'
+import { computed, ref, onBeforeUnmount, onMounted } from 'vue'
 import {
   Bookmark,
   Check,
@@ -20,6 +20,12 @@ import {
   FORMULA_COPY_FORMAT_LABELS,
   MARKDOWN_FORMULA_WRAP_LABELS
 } from '@/main/constants'
+import {
+  SITE_ACTIVATION_MODE_LABELS,
+  SUPPORTED_SITE_ITEMS,
+  normalizeSiteHostname,
+  sanitizeSiteList
+} from '@/main/site-policy'
 import { copyTextToClipboard, formatTimestamp, truncateText, normalizeKeepLatest } from '@/main/utils'
 import {
   readSettings,
@@ -42,6 +48,8 @@ const history = ref<FormulaHistoryEntry[]>([])
 const saveStatus = ref('')
 const promptStatus = ref('')
 const editorPayload = ref<OpenEditorPayload | null>(null)
+const siteWhitelistInput = ref('')
+const siteBlacklistInput = ref('')
 let unsubEditor: (() => void) | null = null
 
 const navItems = [
@@ -66,6 +74,12 @@ function setPromptStatus(message: string): void {
   }, 2600)
 }
 
+const siteModeOptions = computed(() => {
+  return Object.entries(SITE_ACTIVATION_MODE_LABELS).map(([value, label]) => ({ value, label }))
+})
+const whitelistSites = computed(() => sanitizeSiteList(settings.value?.siteWhitelist))
+const blacklistSites = computed(() => sanitizeSiteList(settings.value?.siteBlacklist))
+
 async function loadData(): Promise<void> {
   const [s, p, h] = await Promise.all([readSettings(), readPrompts(), readFormulaHistory()])
   settings.value = s
@@ -78,6 +92,38 @@ async function update<K extends keyof ChatGoSettings>(key: K, value: ChatGoSetti
   ;(settings.value as Record<string, unknown>)[key] = value
   await writeSettings({ [key]: value } as Partial<ChatGoSettings>)
   setSaveStatus('已保存')
+}
+
+async function updateSiteLists(whitelist: string[], blacklist: string[], message = '已保存'): Promise<void> {
+  if (!settings.value) return
+  const nextWhitelist = sanitizeSiteList(whitelist)
+  const nextBlacklist = sanitizeSiteList(blacklist).filter((item) => !nextWhitelist.includes(item))
+  settings.value.siteWhitelist = nextWhitelist
+  settings.value.siteBlacklist = nextBlacklist
+  await writeSettings({ siteWhitelist: nextWhitelist, siteBlacklist: nextBlacklist })
+  setSaveStatus(message)
+}
+
+async function addWhitelistSite(): Promise<void> {
+  const hostname = normalizeSiteHostname(siteWhitelistInput.value)
+  if (!hostname) return
+  siteWhitelistInput.value = ''
+  await updateSiteLists([...whitelistSites.value, hostname], blacklistSites.value.filter((item) => item !== hostname), '已加入白名单')
+}
+
+async function addBlacklistSite(): Promise<void> {
+  const hostname = normalizeSiteHostname(siteBlacklistInput.value)
+  if (!hostname) return
+  siteBlacklistInput.value = ''
+  await updateSiteLists(whitelistSites.value.filter((item) => item !== hostname), [...blacklistSites.value, hostname], '已加入黑名单')
+}
+
+async function removeWhitelistSite(hostname: string): Promise<void> {
+  await updateSiteLists(whitelistSites.value.filter((item) => item !== hostname), blacklistSites.value, '已移出白名单')
+}
+
+async function removeBlacklistSite(hostname: string): Promise<void> {
+  await updateSiteLists(whitelistSites.value, blacklistSites.value.filter((item) => item !== hostname), '已移出黑名单')
 }
 
 function openNewPromptEditor(): void {
@@ -423,14 +469,78 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <section id="sites" class="settings-section">
+      <section v-if="settings" id="sites" class="settings-section">
         <div class="section-head">
           <Globe2 aria-hidden="true" :size="20" :stroke-width="2" />
           <div>
             <h3>支持站点</h3>
-            <p>ChatGPT、DeepSeek、Gemini、NextChat / ChatGPT-Next-Web、LobeChat，以及其他站点自动启发式适配。</p>
+            <p>配置默认启用范围。站点被停用后仍可从这里或扩展弹窗重新启用。</p>
           </div>
         </div>
+
+        <div class="setting-group">
+          <div class="setting-label">
+            <strong>默认启用模式</strong>
+            <span>决定未进入白名单或黑名单的站点是否运行 ChatGo。</span>
+          </div>
+          <RadioRow
+            v-model="settings.siteActivationMode"
+            name="opt-site-mode"
+            :options="siteModeOptions"
+            @update:model-value="update('siteActivationMode', $event as ChatGoSettings['siteActivationMode'])"
+          />
+        </div>
+
+        <div class="site-grid">
+          <section class="site-panel">
+            <div class="site-panel__head">
+              <h4>白名单站点</h4>
+              <p>这些站点会强制启用，优先级高于默认模式。</p>
+            </div>
+            <form class="site-add" @submit.prevent="addWhitelistSite">
+              <input v-model="siteWhitelistInput" type="text" placeholder="chatgpt.com" />
+              <button class="btn" type="submit">添加</button>
+            </form>
+            <div v-if="whitelistSites.length" class="site-chip-list">
+              <button v-for="hostname in whitelistSites" :key="hostname" class="site-chip" type="button" @click="removeWhitelistSite(hostname)">
+                <span>{{ hostname }}</span>
+                <Trash2 aria-hidden="true" :size="13" :stroke-width="2.2" />
+              </button>
+            </div>
+            <p v-else class="site-empty">还没有白名单站点</p>
+          </section>
+
+          <section class="site-panel">
+            <div class="site-panel__head">
+              <h4>黑名单站点</h4>
+              <p>这些站点会停用 ChatGo，可从这里移除恢复。</p>
+            </div>
+            <form class="site-add" @submit.prevent="addBlacklistSite">
+              <input v-model="siteBlacklistInput" type="text" placeholder="example.com" />
+              <button class="btn" type="submit">添加</button>
+            </form>
+            <div v-if="blacklistSites.length" class="site-chip-list">
+              <button v-for="hostname in blacklistSites" :key="hostname" class="site-chip site-chip--danger" type="button" @click="removeBlacklistSite(hostname)">
+                <span>{{ hostname }}</span>
+                <Trash2 aria-hidden="true" :size="13" :stroke-width="2.2" />
+              </button>
+            </div>
+            <p v-else class="site-empty">还没有黑名单站点</p>
+          </section>
+        </div>
+
+        <section class="site-panel">
+          <div class="site-panel__head">
+            <h4>内置适配器</h4>
+            <p>默认“常见 AI 站点”模式会启用这些非通用适配器。</p>
+          </div>
+          <ul class="supported-sites">
+            <li v-for="item in SUPPORTED_SITE_ITEMS" :key="item.id">
+              <strong>{{ item.name }}</strong>
+              <span>{{ item.pages }}</span>
+            </li>
+          </ul>
+        </section>
       </section>
     </main>
 
@@ -793,6 +903,131 @@ onBeforeUnmount(() => {
   padding: 0 10px;
 }
 
+.site-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.site-panel {
+  border-top: 1px solid rgba(226, 232, 240, 0.9);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  padding: 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.site-panel__head h4 {
+  margin: 0;
+  color: #0F172A;
+  font-size: 14px;
+  font-weight: 740;
+}
+
+.site-panel__head p {
+  margin: 5px 0 0;
+  color: var(--cg-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.site-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.site-add input {
+  min-width: 0;
+  height: 38px;
+  border: 1px solid var(--cg-border);
+  border-radius: 12px;
+  background: #FFFFFF;
+  color: var(--cg-text);
+  font: inherit;
+  font-size: 13px;
+  padding: 0 12px;
+}
+
+.site-add input:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.52);
+  box-shadow: 0 0 0 3px rgba(239, 246, 255, 0.96);
+}
+
+.site-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.site-chip {
+  min-height: 30px;
+  border: 1px solid rgba(59, 130, 246, 0.24);
+  border-radius: 999px;
+  background: var(--cg-accent-subtle);
+  color: var(--cg-accent-600);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px 0 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 680;
+  cursor: pointer;
+}
+
+.site-chip--danger {
+  border-color: rgba(220, 38, 38, 0.24);
+  background: #FEF2F2;
+  color: #B91C1C;
+}
+
+.site-empty {
+  min-height: 42px;
+  margin: 0;
+  color: #A2AAB8;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.supported-sites {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.supported-sites li {
+  border: 1px solid var(--cg-border);
+  border-radius: 12px;
+  background: #FFFFFF;
+  padding: 12px;
+}
+
+.supported-sites strong,
+.supported-sites span {
+  display: block;
+}
+
+.supported-sites strong {
+  color: #0F172A;
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.supported-sites span {
+  margin-top: 4px;
+  color: var(--cg-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 :global(html) {
   scroll-behavior: smooth;
 }
@@ -825,6 +1060,11 @@ onBeforeUnmount(() => {
   }
 
   .setting-group {
+    grid-template-columns: 1fr;
+  }
+
+  .site-grid,
+  .supported-sites {
     grid-template-columns: 1fr;
   }
 
