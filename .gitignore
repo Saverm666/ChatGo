@@ -1,5 +1,31 @@
+# Dependencies and build output
 node_modules/
 dist/
-*.log
-.DS_Store
 .vite/
+coverage/
+
+# Logs and local tooling state
+*.log
+*.pid
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*:Zone.Identifier
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+
+# Local reference projects, captured pages, and test artifacts
+ChatGPT-Voyager/
+GPT_page/
+artifacts/

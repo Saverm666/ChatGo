@@ -26,7 +26,7 @@ import {
   normalizeSiteHostname,
   sanitizeSiteList
 } from '@/main/site-policy'
-import { copyTextToClipboard, formatTimestamp, truncateText, normalizeKeepLatest } from '@/main/utils'
+import { copyTextToClipboard, formatTimestamp, truncateText } from '@/main/utils'
 import {
   readSettings,
   writeSettings,
@@ -40,7 +40,7 @@ import RadioRow from '@/components/RadioRow.vue'
 import PromptEditor from '@/content/ui/PromptEditor.vue'
 import { editorBridge, type OpenEditorPayload } from '@/content/editor-bridge'
 import { getPromptCategory } from '@/content/prompt-utils'
-import { renderFormulaPreview } from '@/content/markdown'
+import { renderFormulaPreview } from '@/content/formula-preview'
 
 const settings = ref<ChatGoSettings | null>(null)
 const prompts = ref<SavedPrompt[]>([])
@@ -149,11 +149,10 @@ function openEditPromptEditor(prompt: SavedPrompt): void {
 function getFormulaSiteName(entry: FormulaHistoryEntry): string {
   try {
     const hostname = new URL(entry.sourceUrl).hostname.replace(/^www\./, '')
-    if (hostname.includes('chatgpt.com') || hostname.includes('chat.openai.com')) return 'ChatGPT'
-    if (hostname.includes('deepseek')) return 'DeepSeek'
-    if (hostname.includes('gemini.google.com')) return 'Gemini'
-    if (hostname.includes('lobechat')) return 'LobeChat'
-    if (hostname.includes('nextchat') || hostname.includes('chatgpt-next-web')) return 'NextChat'
+    if (hostname === 'chatgpt.com') return 'ChatGPT'
+    if (hostname === 'chat.deepseek.com') return 'DeepSeek'
+    if (hostname === 'gemini.google.com') return 'Gemini'
+    if (hostname === 'chat.qwen.ai') return 'Qwen'
     return hostname || '未知站点'
   } catch {
     return '未知站点'
@@ -437,23 +436,11 @@ onBeforeUnmount(() => {
             @update:model-value="update('enterEnhancerEnabled', $event)"
           />
           <ToggleRow
-            v-model="settings.collapseEnabled"
-            label="长对话折叠"
-            hint="隐藏较早消息，保留最近 N 轮"
-            @update:model-value="update('collapseEnabled', $event)"
+            v-model="settings.virtualScrollEnabled"
+            label="长对话虚拟滚动"
+            hint="离屏消息停止布局和绘制，滚动接近时自动恢复"
+            @update:model-value="update('virtualScrollEnabled', $event)"
           />
-          <div v-if="settings.collapseEnabled" class="keep-latest">
-            <label>
-              <span>保留最近轮数</span>
-              <input
-                type="number"
-                min="1"
-                max="1000"
-                :value="settings.collapseKeepLatest"
-                @change="update('collapseKeepLatest', normalizeKeepLatest(Number(($event.target as HTMLInputElement).value)))"
-              />
-            </label>
-          </div>
           <ToggleRow
             v-model="settings.branchEnabled"
             label="分支提问"
@@ -532,7 +519,7 @@ onBeforeUnmount(() => {
         <section class="site-panel">
           <div class="site-panel__head">
             <h4>内置适配器</h4>
-            <p>默认“常见 AI 站点”模式会启用这些非通用适配器。</p>
+            <p>当前仅在这些内置支持站点注入 ChatGo。</p>
           </div>
           <ul class="supported-sites">
             <li v-for="item in SUPPORTED_SITE_ITEMS" :key="item.id">

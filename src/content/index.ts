@@ -5,22 +5,12 @@ import type { ChatGoSettings, SiteAdapter } from '@/main/types'
 import { shouldEnableForSite } from '@/main/site-policy'
 import { resolveAdapter } from './sites'
 import { readSettings, onStorageChanged, isExtensionContextInvalidatedError } from '@/main/storage'
-import { formulaCopier } from './modules/formula-copier'
-import { markdownCopy } from './modules/markdown-copy'
-import { enterEnhancer } from './modules/enter-enhancer'
-import { collapse } from './modules/collapse'
-import { branch } from './modules/branch'
-import { floatingPanel } from './modules/floating-panel'
+import { CONTENT_MODULE_SETTING_KEYS, contentFeatureModules } from './modules/registry'
 
 let currentAdapter: SiteAdapter | null = null
 
 function disableAllModules(): void {
-  formulaCopier.disable()
-  markdownCopy.disable()
-  enterEnhancer.disable()
-  collapse.disable()
-  branch.disable()
-  floatingPanel.disable()
+  contentFeatureModules.forEach((module) => module.disable())
 }
 
 // 根据设置应用各模块开关
@@ -33,53 +23,11 @@ function applySettings(settings: ChatGoSettings, adapter: SiteAdapter): void {
     return
   }
 
-  // 公式复制
-  formulaCopier.setCopyFormat(settings.formulaCopyFormat)
-  if (settings.formulaCopierEnabled) {
-    formulaCopier.enable(adapter)
-  } else {
-    formulaCopier.disable()
-  }
-
-  // Markdown 复制
-  markdownCopy.setFormulaWrapMode(settings.markdownFormulaWrapMode)
-  if (settings.markdownCopyEnabled) {
-    markdownCopy.enable(adapter)
-  } else {
-    markdownCopy.disable()
-  }
-
-  // 输入增强
-  if (settings.enterEnhancerEnabled) {
-    enterEnhancer.enable(adapter)
-  } else {
-    enterEnhancer.disable()
-  }
-
-  // 长对话折叠
-  if (settings.collapseEnabled) {
-    collapse.enable(adapter).catch((error) => {
-      console.warn('[ChatGo] 长对话折叠启用失败。', error)
+  contentFeatureModules.forEach((module) => {
+    Promise.resolve(module.apply(settings, adapter)).catch((error) => {
+      console.warn(`[ChatGo] ${module.name}启用失败。`, error)
     })
-  } else {
-    collapse.disable()
-  }
-
-  // 分支提问
-  if (settings.branchEnabled) {
-    branch.enable(adapter)
-  } else {
-    branch.disable()
-  }
-
-  // 悬浮窗（最后启用，面板内会读取其他模块状态）
-  if (settings.floatingPanelEnabled) {
-    floatingPanel.enable(adapter).catch((error) => {
-      console.warn('[ChatGo] 悬浮窗启用失败。', error)
-    })
-  } else {
-    floatingPanel.disable()
-  }
+  })
 }
 
 async function syncSettings(): Promise<void> {
@@ -93,18 +41,10 @@ function setupStorageListener(): void {
   onStorageChanged((changes, area) => {
     if (area !== 'local') return
     const relevantKeys = [
-      'formulaCopierEnabled',
       'siteActivationMode',
       'siteWhitelist',
       'siteBlacklist',
-      'formulaCopyFormat',
-      'markdownCopyEnabled',
-      'markdownFormulaWrapMode',
-      'enterEnhancerEnabled',
-      'collapseEnabled',
-      'collapseKeepLatest',
-      'branchEnabled',
-      'floatingPanelEnabled'
+      ...CONTENT_MODULE_SETTING_KEYS
     ]
     if (relevantKeys.some((k) => k in changes)) {
       syncSettings().catch((error) => {
@@ -132,7 +72,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return false
 })
 
-// 文档就绪后初始化
+// document_start 立即初始化，让虚拟滚动样式赶在长对话首轮布局前生效。
 function bootstrap(): void {
   syncSettings()
     .then(() => setupStorageListener())
@@ -141,10 +81,6 @@ function bootstrap(): void {
     })
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', bootstrap, { once: true })
-} else {
-  bootstrap()
-}
+bootstrap()
 
 export {}

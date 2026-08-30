@@ -87,19 +87,6 @@ export function extractInlineKatexSources(source: string): string[] {
   return sources
 }
 
-export function renderFormulaPreview(source: string): string {
-  if (!source) return ''
-  try {
-    return katex.renderToString(source, {
-      displayMode: true,
-      throwOnError: false,
-      output: 'html'
-    })
-  } catch {
-    return escapeHtml(source)
-  }
-}
-
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')

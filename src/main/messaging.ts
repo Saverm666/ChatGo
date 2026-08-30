@@ -5,8 +5,12 @@ import { isExtensionContextInvalidatedError } from './storage'
 // 消息类型
 export type RuntimeMessage =
   | { type: 'OPEN_OPTIONS_PAGE' }
-  | { type: 'CREATE_BRANCH_DRAFT'; draft: import('./types').BranchPromptDraft }
-  | { type: 'CONSUME_BRANCH_DRAFT'; pathname: string; referrer: string }
+  | {
+      type: 'CREATE_BRANCH_DRAFT'
+      draft: Omit<import('./types').BranchPromptDraft, 'sourceTabId' | 'targetTabId'>
+    }
+  | { type: 'OPEN_BRANCH_TAB'; url: string }
+  | { type: 'CONSUME_BRANCH_DRAFT' }
   | { type: 'CLEAR_BRANCH_DRAFT' }
   | { type: 'GET_PAGE_INFO' }
 

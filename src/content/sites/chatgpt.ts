@@ -6,8 +6,7 @@ export const chatgptAdapter: SiteAdapter = {
   id: 'chatgpt',
   name: 'ChatGPT',
   match(url: URL): boolean {
-    const h = url.hostname
-    return h.includes('chatgpt.com') || h.includes('chat.openai.com')
+    return url.hostname === 'chatgpt.com'
   },
   selectors: {
     messageRoot: '#thread, main#main, main, [role="main"]',

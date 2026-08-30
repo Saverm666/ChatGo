@@ -6,7 +6,7 @@ export const deepseekAdapter: SiteAdapter = {
   id: 'deepseek',
   name: 'DeepSeek',
   match(url: URL): boolean {
-    return url.hostname.includes('deepseek.com')
+    return url.hostname === 'chat.deepseek.com'
   },
   selectors: {
     messageRoot: '#root, main, [class*="chat"]',

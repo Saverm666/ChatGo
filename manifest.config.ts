@@ -1,6 +1,13 @@
 import { defineManifest } from '@crxjs/vite-plugin'
 import pkg from './package.json' with { type: 'json' }
 
+const supportedSiteMatches = [
+  'https://chatgpt.com/*',
+  'https://chat.deepseek.com/*',
+  'https://gemini.google.com/*',
+  'https://chat.qwen.ai/*'
+]
+
 export default defineManifest({
   manifest_version: 3,
   name: 'ChatGo',
@@ -30,12 +37,12 @@ export default defineManifest({
   web_accessible_resources: [
     {
       resources: ['fonts/*'],
-      matches: ['<all_urls>']
+      matches: supportedSiteMatches
     }
   ],
   content_scripts: [
     {
-      matches: ['<all_urls>'],
+      matches: supportedSiteMatches,
       js: ['src/content/index.ts'],
       run_at: 'document_start'
     }

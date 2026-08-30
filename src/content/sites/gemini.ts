@@ -6,10 +6,7 @@ export const geminiAdapter: SiteAdapter = {
   id: 'gemini',
   name: 'Gemini',
   match(url: URL): boolean {
-    return (
-      url.hostname.includes('gemini.google.com') ||
-      (url.hostname.includes('google.com') && url.pathname.includes('gemini'))
-    )
+    return url.hostname === 'gemini.google.com'
   },
   selectors: {
     messageRoot: 'chat-window, main, [role="main"]',

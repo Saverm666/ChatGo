@@ -15,6 +15,7 @@ import {
 } from '@lucide/vue'
 import CgConfirmDialog from '@/content/ui/CgConfirmDialog.vue'
 import CgEmptyState from '@/content/ui/CgEmptyState.vue'
+import CgFormulaPreview from '@/content/ui/CgFormulaPreview.vue'
 import CgPromptCard from '@/content/ui/CgPromptCard.vue'
 import CgSelectMenu from '@/content/ui/CgSelectMenu.vue'
 import type { ChatGoSettings, FormulaHistoryEntry, SavedPrompt, SiteAdapter } from '@/main/types'
@@ -57,17 +58,33 @@ import {
   onStorageChanged
 } from '@/main/storage'
 import { editorBridge } from '@/content/editor-bridge'
-import { renderFormulaPreview } from '@/content/markdown'
 import { sendRuntimeMessage } from '@/main/messaging'
 
 const props = defineProps<{
   adapter: SiteAdapter
+  initialExpanded?: boolean
+  initialPositionRatio?: FloatingRatio
 }>()
+
+const FAB_SIZE = 52
+const VIEWPORT_MARGIN = 8
+const PANEL_GAP = 12
+const PANEL_WIDTH = 360
+const PANEL_HEIGHT_RATIO = 0.7
+const PANEL_MIN_HEIGHT = 380
+const PANEL_MAX_HEIGHT = 560
+const initialPositionRatio = props.initialPositionRatio ?? getDefaultFloatingRatio()
+const initialFabPosition = ratioToPosition(
+  initialPositionRatio,
+  { width: window.innerWidth, height: window.innerHeight },
+  FAB_SIZE,
+  VIEWPORT_MARGIN
+)
 
 const settings = ref<ChatGoSettings | null>(null)
 const prompts = ref<SavedPrompt[]>([])
 const history = ref<FormulaHistoryEntry[]>([])
-const expanded = ref(false)
+const expanded = ref(Boolean(props.initialExpanded))
 const dragging = ref(false)
 const activePage = ref<'library' | 'sites'>('library')
 const activeTab = ref<'prompts' | 'formula'>('prompts')
@@ -77,22 +94,14 @@ const formulaSearch = ref('')
 const ALL_FORMULA_SOURCES = '全部站点'
 const formulaSourceFilter = ref(ALL_FORMULA_SOURCES)
 const confirmDelete = ref<{ open: boolean; promptId: string; name: string }>({ open: false, promptId: '', name: '' })
-const fabX = ref<number | null>(null)
-const fabY = ref<number | null>(null)
-const positionRatio = ref<FloatingRatio>(getDefaultFloatingRatio())
+const fabX = ref<number | null>(initialFabPosition.x)
+const fabY = ref<number | null>(initialFabPosition.y)
+const positionRatio = ref<FloatingRatio>(initialPositionRatio)
 const statusMessage = ref('')
 let statusTimer: number | null = null
 let unsubStorage: (() => void) | null = null
 let unsubBridge: (() => void) | null = null
 let dragMoved = false
-
-const FAB_SIZE = 52
-const VIEWPORT_MARGIN = 8
-const PANEL_GAP = 12
-const PANEL_WIDTH = 360
-const PANEL_HEIGHT_RATIO = 0.7
-const PANEL_MIN_HEIGHT = 380
-const PANEL_MAX_HEIGHT = 560
 
 const siteName = computed(() => props.adapter?.name ?? '当前站点')
 const currentHostname = computed(() => normalizeSiteHostname(window.location.hostname))
@@ -137,11 +146,10 @@ const filteredHistory = computed(() => {
 function getFormulaSiteName(entry: FormulaHistoryEntry): string {
   try {
     const hostname = new URL(entry.sourceUrl).hostname.replace(/^www\./, '')
-    if (hostname.includes('chatgpt.com') || hostname.includes('chat.openai.com')) return 'ChatGPT'
-    if (hostname.includes('deepseek')) return 'DeepSeek'
-    if (hostname.includes('gemini.google.com')) return 'Gemini'
-    if (hostname.includes('lobechat')) return 'LobeChat'
-    if (hostname.includes('nextchat') || hostname.includes('chatgpt-next-web')) return 'NextChat'
+    if (hostname === 'chatgpt.com') return 'ChatGPT'
+    if (hostname === 'chat.deepseek.com') return 'DeepSeek'
+    if (hostname === 'gemini.google.com') return 'Gemini'
+    if (hostname === 'chat.qwen.ai') return 'Qwen'
     return hostname || '未知站点'
   } catch {
     return '未知站点'
@@ -473,7 +481,7 @@ function toggleCollapse(): void {
   const state = api.getState()
   if (state.collapsedCount > 0) {
     api.restore()
-    setStatus('已恢复隐藏消息')
+    setStatus('已关闭虚拟滚动')
   } else {
     const result = api.collapse()
     setStatus(result.message)
@@ -484,7 +492,9 @@ const collapseStateText = computed(() => {
   const api = window.ChatGoCollapse
   if (!api) return ''
   const state = api.getState()
-  return state.collapsedCount > 0 ? `已折叠 ${state.collapsedCount} 条 · 点击恢复` : '轻量对话'
+  return state.collapsedCount > 0
+    ? `已轻量化 ${state.collapsedCount} 条 · 点击关闭`
+    : '开启虚拟滚动'
 })
 
 onMounted(async () => {
@@ -500,6 +510,7 @@ onMounted(async () => {
       'markdownCopyEnabled',
       'markdownFormulaWrapMode',
       'enterEnhancerEnabled',
+      'virtualScrollEnabled',
       'collapseEnabled',
       'collapseKeepLatest',
       'branchEnabled',
@@ -678,7 +689,10 @@ onBeforeUnmount(() => {
                       复制
                     </button>
                   </div>
-                  <div class="cg-formula-card__formula" v-html="renderFormulaPreview(h.latexSource || h.text)" />
+                  <CgFormulaPreview
+                    class="cg-formula-card__formula"
+                    :source="h.latexSource || h.text"
+                  />
                   <div class="cg-formula-card__meta">
                     <span>{{ formatTimestamp(h.copiedAt) || '刚刚' }}</span>
                     <span>{{ getFormulaSiteName(h) }}</span>

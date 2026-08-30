@@ -1,25 +1,10 @@
 // ChatGo background service worker
 // 职责：安装初始化、分支草稿中转、打开设置页
 
-import { DEFAULT_SETTINGS, STORAGE_KEYS, BRANCH_DRAFT_TTL_MS } from '@/main/constants'
+import { DEFAULT_SETTINGS, STORAGE_KEYS } from '@/main/constants'
 import type { BranchPromptDraft } from '@/main/types'
 import { isExtensionContextInvalidatedError } from '@/main/storage'
-
-// 判断分支草稿是否新鲜
-function isFreshBranchDraft(draft: BranchPromptDraft | null): boolean {
-  return Boolean(
-    draft &&
-      typeof draft.text === 'string' &&
-      draft.text.trim() &&
-      typeof draft.sourceTurnId === 'string' &&
-      draft.sourceTurnId &&
-      typeof draft.sourceTabId === 'number' &&
-      Number.isFinite(draft.sourceTabId) &&
-      typeof draft.createdAt === 'number' &&
-      Number.isFinite(draft.createdAt) &&
-      Date.now() - draft.createdAt < BRANCH_DRAFT_TTL_MS
-  )
-}
+import { canTabConsumeBranchDraft, isFreshBranchDraft } from './branch-draft'
 
 // 清空分支草稿
 async function clearBranchDraft(): Promise<void> {
@@ -48,10 +33,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // 创建分支草稿
   if (message?.type === 'CREATE_BRANCH_DRAFT') {
-    const draft = message.draft as BranchPromptDraft
-    if (!draft?.text?.trim() || !draft.sourceTurnId || typeof draft.sourceTabId !== 'number') {
+    const incomingDraft = message.draft as Omit<
+      BranchPromptDraft,
+      'sourceTabId' | 'targetTabId'
+    >
+    const sourceTabId = sender.tab?.id
+    if (
+      !incomingDraft?.text?.trim() ||
+      !incomingDraft.sourceTurnId ||
+      typeof sourceTabId !== 'number'
+    ) {
       sendResponse({ ok: false, error: '分支草稿参数不完整。' })
       return false
+    }
+    const draft: BranchPromptDraft = {
+      ...incomingDraft,
+      sourceTabId,
+      targetTabId: undefined
     }
     chrome.storage.local
       .set({ [STORAGE_KEYS.BRANCH_DRAFT]: draft })
@@ -62,7 +60,61 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true
   }
 
-  // 消费分支草稿（校验是否来自同源分支）
+  // 先创建空白标签页并绑定唯一 tab ID，再导航，避免其他新对话误消费草稿。
+  if (message?.type === 'OPEN_BRANCH_TAB') {
+    const sourceTabId = sender.tab?.id
+    const sourceUrl = sender.tab?.url
+    try {
+      if (typeof sourceTabId !== 'number' || !sourceUrl) {
+        throw new Error('无法识别分支来源标签页。')
+      }
+      const targetUrl = new URL(String(message.url ?? ''), sourceUrl)
+      const sourceOrigin = new URL(sourceUrl).origin
+      if (!['http:', 'https:'].includes(targetUrl.protocol) || targetUrl.origin !== sourceOrigin) {
+        throw new Error('分支目标地址无效。')
+      }
+      ;(async () => {
+        const stored = await chrome.storage.local.get({ [STORAGE_KEYS.BRANCH_DRAFT]: null })
+        const draft = (stored[STORAGE_KEYS.BRANCH_DRAFT] as BranchPromptDraft | null) ?? null
+        if (!isFreshBranchDraft(draft) || draft.sourceTabId !== sourceTabId) {
+          throw new Error('没有可绑定到当前页面的分支草稿。')
+        }
+
+        const tab = await chrome.tabs.create({
+          url: 'about:blank',
+          openerTabId: sourceTabId,
+          active: false
+        })
+        if (typeof tab.id !== 'number') throw new Error('无法识别新建的分支标签页。')
+
+        try {
+          await chrome.storage.local.set({
+            [STORAGE_KEYS.BRANCH_DRAFT]: { ...draft, targetTabId: tab.id }
+          })
+          await chrome.tabs.update(tab.id, { url: targetUrl.href, active: true })
+          sendResponse({ ok: true, data: { tabId: tab.id } })
+        } catch (error) {
+          await clearBranchDraft()
+          await chrome.tabs.remove(tab.id).catch(() => undefined)
+          throw error
+        }
+      })().catch((error) =>
+        sendResponse({
+          ok: false,
+          error: error instanceof Error ? error.message : '打开分支标签页失败。'
+        })
+      )
+    } catch (error) {
+      sendResponse({
+        ok: false,
+        error: error instanceof Error ? error.message : '分支目标地址无效。'
+      })
+      return false
+    }
+    return true
+  }
+
+  // 仅允许后台为本次分支显式绑定的目标标签页消费草稿。
   if (message?.type === 'CONSUME_BRANCH_DRAFT') {
     chrome.storage.local
       .get({ [STORAGE_KEYS.BRANCH_DRAFT]: null })
@@ -74,18 +126,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           return
         }
         const currentTabId = sender.tab?.id
-        const openerTabId = sender.tab?.openerTabId
-        const currentPath = String(message.pathname ?? '').trim()
-        const currentReferrer = String(message.referrer ?? '').trim()
-        const isDifferentTab = typeof currentTabId === 'number' && currentTabId !== draft.sourceTabId
-        const isDifferentPath = !currentPath || !draft.sourcePath || currentPath !== draft.sourcePath
-        const matchesOpener = typeof openerTabId === 'number' && openerTabId === draft.sourceTabId
-        const matchesReferrer =
-          Boolean(draft.sourceUrl) &&
-          Boolean(currentReferrer) &&
-          currentReferrer.startsWith(draft.sourceUrl)
-
-        if (isDifferentTab && isDifferentPath && (matchesOpener || matchesReferrer)) {
+        if (canTabConsumeBranchDraft(draft, currentTabId)) {
           await clearBranchDraft()
           sendResponse({ ok: true, data: draft })
           return

@@ -53,6 +53,7 @@ export interface BranchPromptDraft {
   sourcePath: string
   sourceUrl: string
   sourceTabId: number
+  targetTabId?: number
   createdAt: number
 }
 
@@ -87,6 +88,7 @@ export interface ChatGoSettings {
   markdownCopyEnabled: boolean
   markdownFormulaWrapMode: MarkdownFormulaWrapMode
   enterEnhancerEnabled: boolean
+  virtualScrollEnabled: boolean
   collapseEnabled: boolean
   collapseKeepLatest: number
   branchEnabled: boolean
