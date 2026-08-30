@@ -1,6 +1,7 @@
 # Dependencies and build output
 node_modules/
 dist/
+release/
 .vite/
 coverage/
 
@@ -16,6 +17,7 @@ Thumbs.db
 *:Zone.Identifier
 
 # Local environment and credentials
+.keys/
 .env
 .env.*
 !.env.example
