@@ -11,15 +11,14 @@ ChatGo 是一款 Chrome MV3 扩展，为常用 AI 聊天网站补充公式复制
 
 ## 安装
 
-### 使用 CRX 安装（推荐）
+### 使用 Release 安装包
 
-1. 在项目的 [Releases](https://github.com/Saverm666/ChatGo/releases) 页面下载最新版 `ChatGo-v*.crx`。
-2. 在 Chrome 地址栏打开 `chrome://extensions/`。
-3. 打开页面右上角的“开发者模式”。
-4. 将下载的 `.crx` 文件拖入扩展管理页面，然后确认安装。
-5. 安装完成后刷新已经打开的 AI 聊天页面。
-
-> Chrome 可能会根据系统或浏览器安全策略阻止非 Chrome 应用商店来源的 CRX。若拖拽安装被拦截，请下载同一 Release 中的 ZIP，解压后在扩展管理页点击“加载已解压的扩展程序”，选择解压目录。
+1. 在项目的 [Releases](https://github.com/Saverm666/ChatGo/releases) 页面下载最新版 `ChatGo-v*.zip`。
+2. 将 ZIP 完整解压到一个固定目录；请勿直接选择 ZIP 文件。
+3. 在 Chrome 地址栏打开 `chrome://extensions/`。
+4. 打开页面右上角的“开发者模式”。
+5. 点击“加载已解压的扩展程序”，选择刚才的解压目录。
+6. 安装完成后刷新已经打开的 AI 聊天页面。
 
 ### 从源码安装
 
@@ -46,7 +45,7 @@ pnpm build
 
 ## 更新
 
-下载新版 CRX 后，再次拖入 `chrome://extensions/` 即可更新。不要删除旧扩展后再安装，否则浏览器中保存的设置、提示词和公式历史可能丢失。
+下载新版 ZIP，将内容解压并覆盖到原来的扩展目录，然后在 `chrome://extensions/` 中点击 ChatGo 卡片上的“重新加载”按钮。请保持解压目录路径不变，也不要先删除旧扩展，否则浏览器中保存的设置、提示词和公式历史可能丢失。
 
 ## 开发验证
 
