@@ -4,7 +4,12 @@
 import { DEFAULT_SETTINGS, STORAGE_KEYS } from '@/main/constants'
 import type { BranchPromptDraft } from '@/main/types'
 import { isExtensionContextInvalidatedError } from '@/main/storage'
-import { canTabConsumeBranchDraft, isFreshBranchDraft } from './branch-draft'
+import {
+  canTabConsumeBranchDraft,
+  canTabConsumeNativeChatGptDraft,
+  canTabConsumeNativeGeminiDraft,
+  isFreshBranchDraft
+} from './branch-draft'
 
 // 清空分支草稿
 async function clearBranchDraft(): Promise<void> {
@@ -126,7 +131,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           return
         }
         const currentTabId = sender.tab?.id
-        if (canTabConsumeBranchDraft(draft, currentTabId)) {
+        if (
+          canTabConsumeBranchDraft(draft, currentTabId) ||
+          canTabConsumeNativeGeminiDraft(draft, {
+            tabId: currentTabId,
+            openerTabId: sender.tab?.openerTabId,
+            url: sender.tab?.url
+          }) ||
+          canTabConsumeNativeChatGptDraft(draft, {
+            tabId: currentTabId,
+            openerTabId: sender.tab?.openerTabId,
+            url: sender.tab?.url
+          })
+        ) {
           await clearBranchDraft()
           sendResponse({ ok: true, data: draft })
           return

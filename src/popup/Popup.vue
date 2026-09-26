@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { ArrowUpRight, ChevronRight, Settings2 } from '@lucide/vue'
 import type { ChatGoSettings, FormulaHistoryEntry, SavedPrompt } from '@/main/types'
 import {
   FORMULA_COPY_FORMAT_LABELS,
@@ -28,6 +29,7 @@ const settings = ref<ChatGoSettings | null>(null)
 const prompts = ref<SavedPrompt[]>([])
 const history = ref<FormulaHistoryEntry[]>([])
 const status = ref('')
+const activeTab = ref<'features' | 'formats' | 'library'>('features')
 
 function setStatus(message: string): void {
   status.value = message
@@ -144,328 +146,213 @@ onMounted(async () => {
 <template>
   <main class="popup">
     <header class="head">
-      <div class="head__mark">
-        <svg viewBox="120 120 260 260" aria-hidden="true">
+      <div class="head__mark" aria-hidden="true">
+        <svg viewBox="120 120 260 260">
           <path d="M 170,140 H 330 A 30,30 0 0 1 360,170 V 270 A 30,30 0 0 1 330,300 H 220 L 160,350 V 300 A 30,30 0 0 1 140,270 V 170 A 30,30 0 0 1 170,140 Z" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" />
           <rect x="185" y="185" width="130" height="30" rx="10" fill="#E8F4FF" />
           <rect x="185" y="230" width="90" height="30" rx="10" fill="#4BA3FF" />
         </svg>
       </div>
-      <div>
+      <div class="head__identity">
         <h1>ChatGo</h1>
-        <p class="head__site">{{ adapterName ? adapterName : '未识别站点' }}</p>
+        <p>{{ adapterName || '聊天效率工具' }}</p>
       </div>
+      <button class="head__settings" type="button" aria-label="打开完整设置" title="打开完整设置" @click="openOptions">
+        <Settings2 aria-hidden="true" :size="18" :stroke-width="1.9" />
+      </button>
     </header>
 
-    <section v-if="settings" class="card">
-      <div class="card__section">
-        <p class="card__label">公式复制格式</p>
-        <RadioRow
-          v-model="settings.formulaCopyFormat"
-          name="formula-format"
-          :options="[
+    <section v-if="settings" class="site-panel" aria-label="当前站点">
+      <div class="site-panel__info">
+        <span class="eyebrow">当前站点</span>
+        <strong :title="currentHostname">{{ currentHostname || '未知站点' }}</strong>
+        <span class="site-panel__status"><i aria-hidden="true" />{{ currentSiteStatusText }}</span>
+      </div>
+      <div class="site-panel__actions">
+        <button type="button" :disabled="!currentHostname" :class="{ 'is-selected': currentSiteInWhitelist }" @click="enableCurrentSite">启用</button>
+        <button type="button" :disabled="!currentHostname" :class="{ 'is-selected is-danger': currentSiteInBlacklist }" @click="disableCurrentSite">停用</button>
+      </div>
+    </section>
+
+    <nav class="tabs" aria-label="弹窗内容">
+      <button type="button" :aria-pressed="activeTab === 'features'" :class="{ 'is-active': activeTab === 'features' }" @click="activeTab = 'features'">功能</button>
+      <button type="button" :aria-pressed="activeTab === 'formats'" :class="{ 'is-active': activeTab === 'formats' }" @click="activeTab = 'formats'">格式</button>
+      <button type="button" :aria-pressed="activeTab === 'library'" :class="{ 'is-active': activeTab === 'library' }" @click="activeTab = 'library'">收藏</button>
+    </nav>
+
+    <div v-if="settings" :key="activeTab" class="content">
+      <section v-if="activeTab === 'features'" class="pane" aria-label="功能开关">
+        <div class="section-head">
+          <div><span class="eyebrow">01 / FEATURES</span><h2>功能开关</h2></div>
+          <span class="section-head__note">即改即用</span>
+        </div>
+        <div class="toggle-list">
+          <ToggleRow v-model="settings.formulaCopierEnabled" label="公式点击复制" hint="点击公式即可按设定格式复制" @update:model-value="update('formulaCopierEnabled', $event)" />
+          <ToggleRow v-model="settings.markdownCopyEnabled" label="选区复制为 Markdown" hint="保留标题、列表、代码和公式结构" @update:model-value="update('markdownCopyEnabled', $event)" />
+          <ToggleRow v-model="settings.enterEnhancerEnabled" label="Enter / Ctrl+Enter" hint="Enter 换行，Ctrl+Enter 发送" @update:model-value="update('enterEnhancerEnabled', $event)" />
+          <ToggleRow v-model="settings.branchEnabled" label="分支提问" hint="选区转引用，在新对话中继续" @update:model-value="update('branchEnabled', $event)" />
+          <ToggleRow v-model="settings.conversationNavigatorEnabled" label="对话节点导航" hint="快速跳转提问，官方目录出现时隐藏" @update:model-value="update('conversationNavigatorEnabled', $event)" />
+          <ToggleRow v-model="settings.floatingPanelEnabled" label="悬浮窗" hint="在页面显示可拖动入口" @update:model-value="update('floatingPanelEnabled', $event)" />
+        </div>
+      </section>
+
+      <section v-else-if="activeTab === 'formats'" class="pane" aria-label="格式与站点模式">
+        <div class="section-head"><div><span class="eyebrow">02 / PREFERENCES</span><h2>复制与站点</h2></div></div>
+        <div class="option-group">
+          <h3>公式复制格式</h3>
+          <RadioRow v-model="settings.formulaCopyFormat" name="formula-format" :options="[
             { value: 'latex', label: FORMULA_COPY_FORMAT_LABELS.latex },
             { value: 'unicode-math', label: FORMULA_COPY_FORMAT_LABELS['unicode-math'] },
             { value: 'latex-source', label: FORMULA_COPY_FORMAT_LABELS['latex-source'] }
-          ]"
-          @update:model-value="update('formulaCopyFormat', $event as ChatGoSettings['formulaCopyFormat'])"
-        />
-      </div>
-
-      <div class="card__section">
-        <p class="card__label">公式在 Markdown 中</p>
-        <RadioRow
-          v-model="settings.markdownFormulaWrapMode"
-          name="wrap-mode"
-          :options="[
+          ]" @update:model-value="update('formulaCopyFormat', $event as ChatGoSettings['formulaCopyFormat'])" />
+        </div>
+        <div class="option-group">
+          <h3>Markdown 中的公式</h3>
+          <RadioRow v-model="settings.markdownFormulaWrapMode" name="wrap-mode" :options="[
             { value: 'with-delimiters', label: MARKDOWN_FORMULA_WRAP_LABELS['with-delimiters'] },
             { value: 'bare', label: MARKDOWN_FORMULA_WRAP_LABELS.bare }
-          ]"
-          @update:model-value="update('markdownFormulaWrapMode', $event as ChatGoSettings['markdownFormulaWrapMode'])"
-        />
-      </div>
-
-      <div class="card__divider" />
-
-      <div class="card__section">
-        <p class="card__label">当前站点</p>
-        <div class="site-box">
-          <div>
-            <strong>{{ currentHostname || '未知站点' }}</strong>
-            <span>{{ currentSiteStatusText }}</span>
-          </div>
-          <div class="site-actions">
-            <button type="button" @click="enableCurrentSite">启用</button>
-            <button type="button" class="site-actions__danger" @click="disableCurrentSite">停用</button>
-          </div>
+          ]" @update:model-value="update('markdownFormulaWrapMode', $event as ChatGoSettings['markdownFormulaWrapMode'])" />
         </div>
-      </div>
+        <div class="option-group">
+          <h3>默认站点模式</h3>
+          <RadioRow v-model="settings.siteActivationMode" name="site-mode" :options="siteModeOptions" @update:model-value="update('siteActivationMode', $event as ChatGoSettings['siteActivationMode'])" />
+        </div>
+      </section>
 
-      <div class="card__section">
-        <p class="card__label">默认站点模式</p>
-        <RadioRow
-          v-model="settings.siteActivationMode"
-          name="site-mode"
-          :options="siteModeOptions"
-          @update:model-value="update('siteActivationMode', $event as ChatGoSettings['siteActivationMode'])"
-        />
-      </div>
-
-      <div class="card__divider" />
-
-      <ToggleRow
-        v-model="settings.formulaCopierEnabled"
-        label="公式点击复制"
-        hint="点击公式按上方格式复制"
-        @update:model-value="update('formulaCopierEnabled', $event)"
-      />
-      <ToggleRow
-        v-model="settings.markdownCopyEnabled"
-        label="选区复制为 Markdown"
-        hint="框选复制时保留 Markdown 结构"
-        @update:model-value="update('markdownCopyEnabled', $event)"
-      />
-      <ToggleRow
-        v-model="settings.enterEnhancerEnabled"
-        label="Enter / Ctrl+Enter"
-        hint="Enter 换行，Ctrl+Enter 发送"
-        @update:model-value="update('enterEnhancerEnabled', $event)"
-      />
-      <ToggleRow
-        v-model="settings.collapseEnabled"
-        label="长对话折叠"
-        hint="隐藏较早消息，保留最近 N 轮"
-        @update:model-value="update('collapseEnabled', $event)"
-      />
-      <ToggleRow
-        v-model="settings.branchEnabled"
-        label="分支提问"
-        hint="选区转引用，在新对话页打开"
-        @update:model-value="update('branchEnabled', $event)"
-      />
-      <ToggleRow
-        v-model="settings.floatingPanelEnabled"
-        label="悬浮窗"
-        hint="在页面显示可拖动入口"
-        @update:model-value="update('floatingPanelEnabled', $event)"
-      />
-    </section>
-
-    <section class="card">
-      <p class="card__label">提示词</p>
-      <p v-if="sortedPrompts.length === 0" class="empty">还没有保存提示词</p>
-      <ul v-else class="list">
-        <li v-for="p in sortedPrompts.slice(0, 6)" :key="p.id">
-          <button class="item" @click="copyPrompt(p)">
-            <span class="item__title">{{ p.pinned ? '★ ' : '' }}{{ p.name || '未命名' }}</span>
-            <span class="item__sub">{{ truncateText(p.content, 36) }}</span>
-          </button>
-        </li>
-      </ul>
-    </section>
-
-    <section class="card">
-      <p class="card__label">公式历史</p>
-      <p v-if="history.length === 0" class="empty">还没有复制记录</p>
-      <ul v-else class="list">
-        <li v-for="(h, i) in history.slice(0, 6)" :key="i">
-          <button class="item" @click="copyHistoryEntry(h)">
-            <span class="item__title">{{ FORMULA_COPY_FORMAT_LABELS[h.format] }}</span>
-            <span class="item__sub">{{ formatTimestamp(h.copiedAt) }} · {{ truncateText(h.latexSource || h.text, 28) }}</span>
-          </button>
-        </li>
-      </ul>
-    </section>
+      <section v-else class="pane" aria-label="收藏与历史">
+        <div class="section-head"><div><span class="eyebrow">03 / LIBRARY</span><h2>随手取用</h2></div></div>
+        <div class="library-group">
+          <div class="library-group__head"><h3>提示词</h3><span>{{ prompts.length }} 条</span></div>
+          <p v-if="sortedPrompts.length === 0" class="empty">还没有保存提示词</p>
+          <ul v-else class="list">
+            <li v-for="p in sortedPrompts.slice(0, 6)" :key="p.id">
+              <button class="item" type="button" @click="copyPrompt(p)">
+                <span class="item__text"><strong>{{ p.pinned ? '★ ' : '' }}{{ p.name || '未命名' }}</strong><small>{{ truncateText(p.content, 42) }}</small></span>
+                <ChevronRight aria-hidden="true" :size="15" :stroke-width="2" />
+              </button>
+            </li>
+          </ul>
+        </div>
+        <div class="library-group">
+          <div class="library-group__head"><h3>公式历史</h3><span>{{ history.length }} 条</span></div>
+          <p v-if="history.length === 0" class="empty">还没有复制记录</p>
+          <ul v-else class="list">
+            <li v-for="(h, i) in history.slice(0, 6)" :key="i">
+              <button class="item" type="button" @click="copyHistoryEntry(h)">
+                <span class="item__text"><strong>{{ FORMULA_COPY_FORMAT_LABELS[h.format] }}</strong><small>{{ formatTimestamp(h.copiedAt) }} · {{ truncateText(h.latexSource || h.text, 32) }}</small></span>
+                <ChevronRight aria-hidden="true" :size="15" :stroke-width="2" />
+              </button>
+            </li>
+          </ul>
+        </div>
+      </section>
+    </div>
 
     <footer class="foot">
-      <button class="foot__btn" @click="openOptions">打开完整设置</button>
-      <p v-if="status" class="foot__status">{{ status }}</p>
+      <button type="button" @click="openOptions">打开完整设置 <ArrowUpRight aria-hidden="true" :size="14" :stroke-width="2" /></button>
+      <span>ChatGo · {{ adapterName || '多站点' }}</span>
     </footer>
+    <p v-if="status" class="toast" role="status" aria-live="polite">{{ status }}</p>
   </main>
 </template>
 
 <style scoped>
 .popup {
   width: 360px;
-  padding: 16px;
+  max-height: 580px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  background: #fff;
+  color: #111827;
   font-family: var(--cg-font-body);
-  background: var(--cg-bg);
-  color: var(--cg-text);
+  position: relative;
 }
 .head {
+  min-height: 72px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 4px;
+  gap: 11px;
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid #e9edf4;
 }
-.head__mark {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  background: transparent;
+.head__mark { width: 36px; height: 36px; flex: 0 0 36px; }
+.head__mark svg { display: block; width: 100%; height: 100%; }
+.head__identity { min-width: 0; flex: 1; }
+.head h1 { margin: 0; font: 700 20px/1.1 var(--cg-font-display); letter-spacing: -0.035em; }
+.head__identity p { margin: 4px 0 0; color: #778296; font-size: 11px; line-height: 1.1; }
+.head__settings {
+  width: 32px; height: 32px; border: 1px solid #e5eaf2; border-radius: 10px;
+  background: #fff; color: #536174; display: grid; place-items: center; cursor: pointer;
+}
+.head__settings:hover { color: #2563eb; border-color: #bfdbfe; background: #eff6ff; }
+.site-panel {
+  margin: 12px 16px 0;
+  padding: 12px 13px;
+  min-height: 86px;
+  border: 1px solid #dbe7f7;
+  border-radius: 14px;
+  background: #f4f8ff;
   display: flex;
   align-items: center;
-  justify-content: center;
-}
-.head__mark svg {
-  width: 38px;
-  height: 38px;
-}
-.head h1 {
-  font-family: var(--cg-font-display);
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin: 0;
-  line-height: 1.2;
-}
-.head__site {
-  font-size: 12px;
-  color: var(--cg-text-muted);
-  line-height: 1.2;
-  margin: 0;
-}
-.card {
-  background: var(--cg-bg-soft);
-  border: 1px solid var(--cg-border);
-  border-radius: var(--cg-radius);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-}
-.card__section {
-  padding: 4px 0 10px;
-}
-.card__section + .card__section {
-  padding-top: 12px;
-  border-top: 1px solid var(--cg-border);
-}
-.card__label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--cg-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin: 0 0 10px;
-}
-.card__divider {
-  height: 1px;
-  background: var(--cg-border);
-  margin: 8px 0;
-}
-.site-box {
-  border: 1px solid var(--cg-border);
-  background: var(--cg-bg);
-  border-radius: var(--cg-radius-sm);
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   gap: 10px;
 }
-.site-box strong {
-  display: block;
-  font-size: 13px;
-  color: var(--cg-text);
-}
-.site-box span {
-  display: block;
-  margin-top: 3px;
-  font-size: 12px;
-  color: var(--cg-text-muted);
-}
-.site-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.site-actions button {
-  border: 1px solid var(--cg-border);
-  background: var(--cg-bg);
-  color: var(--cg-text);
-  border-radius: var(--cg-radius-sm);
-  min-height: 34px;
-  font-size: 13px;
-  font-weight: 650;
-  cursor: pointer;
-}
-.site-actions button:hover {
-  border-color: var(--cg-accent);
-  color: var(--cg-accent);
-}
-.site-actions__danger:hover {
-  border-color: #DC2626 !important;
-  color: #DC2626 !important;
-}
-.empty {
-  font-size: 13px;
-  color: var(--cg-text-muted);
-  padding: 8px 0;
-}
-.list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.item {
-  width: 100%;
-  text-align: left;
-  border: none;
-  background: var(--cg-bg);
-  border: 1px solid var(--cg-border);
-  border-radius: var(--cg-radius-sm);
-  padding: 8px 10px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  transition: all 0.12s ease;
-}
-.item:hover {
-  border-color: var(--cg-accent-200);
-  background: var(--cg-accent-subtle);
-}
-.item__title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--cg-text);
-}
-.item__sub {
-  font-size: 11px;
-  color: var(--cg-text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.foot {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
-  padding-top: 4px;
-}
-.foot__btn {
-  width: 100%;
-  border: 1px solid var(--cg-border-strong);
-  background: var(--cg-bg);
-  color: var(--cg-text);
-  border-radius: var(--cg-radius-sm);
-  padding: 10px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.12s ease;
-}
-.foot__btn:hover {
-  border-color: var(--cg-accent);
-  color: var(--cg-accent);
-  background: var(--cg-accent-subtle);
-}
-.foot__status {
-  font-size: 12px;
-  color: var(--cg-accent);
-}
+.site-panel__info { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.eyebrow { font: 700 10px/1.2 var(--cg-font-mono); letter-spacing: 0.08em; color: #6d86ae; }
+.site-panel__info strong { font-size: 14px; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.site-panel__status { color: #68778e; font-size: 10px; line-height: 1.3; white-space: nowrap; }
+.site-panel__status i { display: inline-block; width: 5px; height: 5px; margin-right: 5px; border-radius: 50%; background: #3b82f6; vertical-align: 2px; }
+.site-panel__actions { display: flex; flex: 0 0 auto; gap: 4px; padding: 3px; border: 1px solid #dbe7f7; border-radius: 10px; background: #fff; }
+.site-panel__actions button { min-width: 40px; height: 29px; border: 0; border-radius: 7px; background: transparent; color: #657287; font-size: 11px; font-weight: 700; cursor: pointer; }
+.site-panel__actions button:hover { background: #f1f6ff; color: #2563eb; }
+.site-panel__actions button.is-selected { background: #eaf2ff; color: #1d4ed8; }
+.site-panel__actions button.is-danger { background: #fff0f0; color: #c33131; }
+.site-panel__actions button:disabled { opacity: .45; cursor: not-allowed; }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 12px 16px 0; padding: 4px; border-radius: 11px; background: #f2f5f9; }
+.tabs button { height: 31px; border: 0; border-radius: 8px; background: transparent; color: #778296; font-size: 12px; font-weight: 700; cursor: pointer; }
+.tabs button:hover { color: #2563eb; }
+.tabs button.is-active { color: #1d4ed8; background: #fff; box-shadow: 0 1px 3px rgba(26, 54, 93, .10); }
+.content { min-height: 0; flex: 1; overflow-y: auto; padding: 15px 20px 10px; scrollbar-width: thin; scrollbar-color: #c8d6ea transparent; }
+.pane { display: flex; flex-direction: column; }
+.section-head { display: flex; justify-content: space-between; align-items: end; margin-bottom: 10px; }
+.section-head h2 { margin: 3px 0 0; font: 700 18px/1.2 var(--cg-font-display); letter-spacing: -0.02em; }
+.section-head__note { color: #8792a3; font-size: 11px; }
+.toggle-list { display: flex; flex-direction: column; }
+.toggle-list :deep(.cg-toggle) { padding: 11px 0; border-bottom: 1px solid #edf0f5; }
+.toggle-list :deep(.cg-toggle:last-child) { border-bottom: 0; }
+.toggle-list :deep(.cg-toggle__text strong) { font-size: 13px; font-weight: 650; }
+.toggle-list :deep(.cg-toggle__text small) { font-size: 10.5px; line-height: 1.4; color: #8290a2; }
+.toggle-list :deep(.cg-toggle__track) { width: 38px; height: 22px; }
+.toggle-list :deep(.cg-toggle__thumb) { width: 18px; height: 18px; }
+.toggle-list :deep(.cg-toggle__track--on .cg-toggle__thumb) { transform: translateX(16px); }
+.option-group { padding: 12px 0 15px; border-bottom: 1px solid #edf0f5; }
+.option-group:first-of-type { padding-top: 3px; }
+.option-group:last-child { border-bottom: 0; }
+.option-group h3, .library-group__head h3 { margin: 0 0 8px; font-size: 12px; font-weight: 750; color: #253247; }
+.option-group :deep(.cg-radio-group) { padding-left: 0; gap: 5px; }
+.option-group :deep(.cg-radio) { min-height: 35px; padding: 7px 10px; border: 1px solid transparent; border-radius: 8px; }
+.option-group :deep(.cg-radio--checked) { background: #eff6ff; border-color: #d8e9ff; }
+.option-group :deep(.cg-radio__label) { font-size: 12px; }
+.option-group :deep(.cg-radio__check) { width: 16px; height: 16px; }
+.option-group :deep(.cg-radio__check::after) { width: 7px; height: 7px; }
+.library-group { padding: 4px 0 14px; }
+.library-group + .library-group { border-top: 1px solid #edf0f5; padding-top: 16px; }
+.library-group__head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
+.library-group__head h3 { margin: 0; font-size: 13px; }
+.library-group__head span { color: #8996a7; font: 600 10px var(--cg-font-mono); }
+.list { list-style: none; margin: 0; padding: 0; }
+.list li + li { border-top: 1px solid #edf0f5; }
+.item { width: 100%; min-height: 47px; padding: 7px 2px; display: flex; align-items: center; gap: 8px; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.item:hover { color: #2563eb; background: #f8fbff; }
+.item__text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.item__text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 650; }
+.item__text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #8996a7; font-size: 10px; }
+.item svg { flex: 0 0 auto; color: #b1bdcd; }
+.empty { margin: 0; padding: 14px 0; color: #8996a7; font-size: 12px; }
+.foot { min-height: 41px; margin: 0 16px; border-top: 1px solid #edf0f5; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.foot button { padding: 4px 0; border: 0; background: transparent; color: #466285; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.foot button:hover { color: #2563eb; }
+.foot span { color: #a3adbc; font: 600 10px var(--cg-font-mono); }
+.toast { position: absolute; bottom: 45px; left: 16px; right: 16px; margin: 0; padding: 9px 12px; border: 1px solid #bcd8ff; border-radius: 9px; background: #eff6ff; color: #1d4ed8; font-size: 12px; box-shadow: 0 6px 16px rgba(29, 78, 216, .12); }
+button:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
 </style>

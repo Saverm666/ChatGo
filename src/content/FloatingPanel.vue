@@ -1,21 +1,19 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, onBeforeUnmount } from 'vue'
 import type { CSSProperties } from 'vue'
 import {
   ArrowLeft,
-  Bookmark,
   Copy,
-  Shield,
+  History,
   Plus,
   Search,
   Settings,
+  SlidersHorizontal,
   Trash2,
-  X,
-  Zap
+  X
 } from '@lucide/vue'
 import CgConfirmDialog from '@/content/ui/CgConfirmDialog.vue'
 import CgEmptyState from '@/content/ui/CgEmptyState.vue'
-import CgFormulaPreview from '@/content/ui/CgFormulaPreview.vue'
 import CgPromptCard from '@/content/ui/CgPromptCard.vue'
 import CgSelectMenu from '@/content/ui/CgSelectMenu.vue'
 import type { ChatGoSettings, FormulaHistoryEntry, SavedPrompt, SiteAdapter } from '@/main/types'
@@ -50,7 +48,6 @@ import {
   readPrompts,
   readFormulaHistory,
   readSettings,
-  readFloatingPosition,
   writePrompts,
   writeFloatingPosition,
   writeSettings,
@@ -59,6 +56,8 @@ import {
 } from '@/main/storage'
 import { editorBridge } from '@/content/editor-bridge'
 import { sendRuntimeMessage } from '@/main/messaging'
+
+const CgFormulaPreview = defineAsyncComponent(() => import('@/content/ui/CgFormulaPreview.vue'))
 
 const props = defineProps<{
   adapter: SiteAdapter
@@ -195,15 +194,6 @@ function applyPositionFromRatio(): void {
   fabY.value = next.y
 }
 
-function isStoredRatio(pos: unknown): pos is FloatingRatio {
-  return Boolean(
-    pos &&
-      typeof pos === 'object' &&
-      typeof (pos as FloatingRatio).xRatio === 'number' &&
-      typeof (pos as FloatingRatio).yRatio === 'number'
-  )
-}
-
 const panelPlacement = computed<PanelPlacement>(() => {
   if (fabX.value == null || fabY.value == null) return { horizontal: 'left', vertical: 'above', side: 'left' }
   return getPanelPlacement(
@@ -279,19 +269,6 @@ async function refreshData(): Promise<void> {
   history.value = h
 }
 
-async function loadPosition(): Promise<void> {
-  const pos = await readFloatingPosition()
-  if (isStoredRatio(pos)) {
-    positionRatio.value = pos
-  } else if (typeof pos?.x === 'number' && typeof pos?.y === 'number') {
-    positionRatio.value = positionToRatio({ x: pos.x, y: pos.y }, getViewport(), FAB_SIZE, VIEWPORT_MARGIN)
-    await writeFloatingPosition(positionRatio.value)
-  } else {
-    positionRatio.value = getDefaultFloatingRatio()
-  }
-  applyPositionFromRatio()
-}
-
 // 拖拽逻辑
 let dragStartX = 0
 let dragStartY = 0
@@ -353,6 +330,15 @@ function closePanel(): void {
 
 function openSiteManager(): void {
   activePage.value = 'sites'
+}
+
+function toggleFormulaHistory(): void {
+  if (activePage.value === 'sites') {
+    activePage.value = 'library'
+    activeTab.value = 'formula'
+    return
+  }
+  activeTab.value = activeTab.value === 'formula' ? 'prompts' : 'formula'
 }
 
 function closeSiteManager(): void {
@@ -472,33 +458,7 @@ async function removeBlacklistSite(hostname: string): Promise<void> {
   }, '已移出黑名单')
 }
 
-function toggleCollapse(): void {
-  const api = window.ChatGoCollapse
-  if (!api) {
-    setStatus('折叠功能未就绪')
-    return
-  }
-  const state = api.getState()
-  if (state.collapsedCount > 0) {
-    api.restore()
-    setStatus('已关闭虚拟滚动')
-  } else {
-    const result = api.collapse()
-    setStatus(result.message)
-  }
-}
-
-const collapseStateText = computed(() => {
-  const api = window.ChatGoCollapse
-  if (!api) return ''
-  const state = api.getState()
-  return state.collapsedCount > 0
-    ? `已轻量化 ${state.collapsedCount} 条 · 点击关闭`
-    : '开启虚拟滚动'
-})
-
 onMounted(async () => {
-  await Promise.all([refreshData(), loadPosition()])
   window.addEventListener('resize', onResize)
   unsubStorage = onStorageChanged((changes) => {
     const settingKeys = [
@@ -510,9 +470,6 @@ onMounted(async () => {
       'markdownCopyEnabled',
       'markdownFormulaWrapMode',
       'enterEnhancerEnabled',
-      'virtualScrollEnabled',
-      'collapseEnabled',
-      'collapseKeepLatest',
       'branchEnabled',
       'floatingPanelEnabled'
     ]
@@ -527,6 +484,7 @@ onMounted(async () => {
   unsubBridge = editorBridge.on(() => {
     refreshData().catch(() => {})
   })
+  await refreshData()
 })
 
 onBeforeUnmount(() => {
@@ -565,21 +523,25 @@ onBeforeUnmount(() => {
                 <rect x="185" y="230" width="90" height="30" rx="10" fill="#4BA3FF" />
               </svg>
             </div>
-            <div>
-              <h1>ChatGo</h1>
-              <span class="cg-panel__site">{{ siteName }}</span>
+            <div class="cg-panel__brand-content">
+              <div class="cg-panel__title-line">
+                <h1>ChatGo</h1>
+                <span class="cg-panel__site">{{ siteName }}</span>
+              </div>
             </div>
           </div>
 
           <div class="cg-panel__head-actions">
             <button
               class="cg-panel__icon-action"
+              :class="{ 'cg-panel__icon-action--active': activePage === 'library' && activeTab === 'formula' }"
               type="button"
-              :aria-label="collapseStateText || '轻量对话'"
-              :title="collapseStateText || '轻量对话'"
-              @click="toggleCollapse"
+              :aria-label="activePage === 'library' && activeTab === 'formula' ? '返回提示词' : '公式历史'"
+              :title="activePage === 'library' && activeTab === 'formula' ? '返回提示词' : '公式历史'"
+              :aria-pressed="activePage === 'library' && activeTab === 'formula'"
+              @click="toggleFormulaHistory"
             >
-              <Zap aria-hidden="true" :size="15" :stroke-width="2.4" />
+              <History aria-hidden="true" :size="17" :stroke-width="2" />
             </button>
             <button
               class="cg-panel__icon-action"
@@ -589,7 +551,7 @@ onBeforeUnmount(() => {
               title="站点管理"
               @click="openSiteManager"
             >
-              <Shield aria-hidden="true" :size="16" :stroke-width="2" />
+              <SlidersHorizontal aria-hidden="true" :size="17" :stroke-width="2" />
             </button>
             <button class="cg-panel__close" type="button" aria-label="打开设置" @click.stop="openSettings">
               <Settings aria-hidden="true" :size="18" :stroke-width="2" />
@@ -602,32 +564,6 @@ onBeforeUnmount(() => {
 
         <div class="cg-panel__body">
           <template v-if="activePage === 'library'">
-            <nav class="cg-tabs" aria-label="悬浮窗功能">
-              <button
-                class="cg-tab"
-                :class="{ 'cg-tab--active': activeTab === 'prompts' }"
-                type="button"
-                @click="activeTab = 'prompts'"
-              >
-                <Bookmark aria-hidden="true" :size="17" :stroke-width="2.2" />
-                提示词
-              </button>
-              <button
-                class="cg-tab"
-                :class="{ 'cg-tab--active': activeTab === 'formula' }"
-                type="button"
-                @click="activeTab = 'formula'"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <text x="3.2" y="16.4" fill="currentColor" font-family="Georgia, 'Times New Roman', serif" font-size="14.5" font-weight="700">L</text>
-                  <text x="9.7" y="10.1" fill="currentColor" font-family="Georgia, 'Times New Roman', serif" font-size="8" font-weight="700">A</text>
-                  <circle cx="17.2" cy="15.9" r="6.4" fill="#FFFFFF" stroke="currentColor" stroke-width="1.75" />
-                  <path d="M17.2 12.2 V15.9 L20.1 17.7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-                公式历史
-              </button>
-            </nav>
-
             <section v-if="activeTab === 'prompts'" class="cg-page">
               <div class="cg-toolbar">
                 <label class="cg-search">

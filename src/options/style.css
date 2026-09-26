@@ -1,7 +1,10 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
+html {
+  scrollbar-gutter: stable;
+}
 body {
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  background: var(--cg-bg-soft);
+  font-family: var(--cg-font-body);
+  background: #F4F7FB;
   color: var(--cg-text);
   min-height: 100vh;
 }

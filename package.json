@@ -1,6 +1,6 @@
 {
   "name": "chatgo",
-  "version": "0.7.10",
+  "version": "0.15.1",
   "private": true,
   "type": "module",
   "description": "ChatGo - 普适化 AI 聊天站点效率增强的 Chrome 扩展",
@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
+    "test": "node --test \"src/**/*.test.ts\"",
     "preview": "vite preview"
   },
   "dependencies": {

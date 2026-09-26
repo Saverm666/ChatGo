@@ -17,14 +17,22 @@ function isListElement(element: Element | null): element is HTMLOListElement | H
   return element instanceof HTMLOListElement || element instanceof HTMLUListElement
 }
 
-function getListItemStart(listItem: HTMLLIElement): number {
+function getListItemStart(listItem: HTMLLIElement, indexes: Map<Element, Map<Element, number>>): number {
   const parent = listItem.parentElement
   if (!(parent instanceof HTMLOListElement)) return 1
 
-  const start = Number(parent.getAttribute('start') ?? '1')
-  const siblings = Array.from(parent.children).filter((child) => child instanceof HTMLLIElement)
-  const index = siblings.indexOf(listItem)
-  return (Number.isFinite(start) ? start : 1) + Math.max(index, 0)
+  let positions = indexes.get(parent)
+  if (!positions) {
+    positions = new Map()
+    const start = Number(parent.getAttribute('start') ?? '1')
+    const initialStart = Number.isFinite(start) ? start : 1
+    let index = 0
+    for (const child of parent.children) {
+      if (child instanceof HTMLLIElement) positions.set(child, initialStart + index++)
+    }
+    indexes.set(parent, positions)
+  }
+  return positions.get(listItem) ?? 1
 }
 
 export function markSelectedListItems(range: Range): Array<() => void> {
@@ -40,13 +48,15 @@ export function markSelectedListItems(range: Range): Array<() => void> {
   })
 
   const cleanup: Array<() => void> = []
+  // Only cache during this synchronous conversion; later copies can see edits.
+  const indexes = new Map<Element, Map<Element, number>>()
   candidates.forEach((item) => {
     if (!rangeIntersectsNode(item, range) || !isListElement(item.parentElement)) return
 
     const previousParent = item.getAttribute(LIST_PARENT_ATTR)
     const previousStart = item.getAttribute(LIST_START_ATTR)
     item.setAttribute(LIST_PARENT_ATTR, item.parentElement.nodeName.toLowerCase())
-    item.setAttribute(LIST_START_ATTR, String(getListItemStart(item)))
+    item.setAttribute(LIST_START_ATTR, String(getListItemStart(item, indexes)))
     cleanup.push(() => {
       if (previousParent === null) {
         item.removeAttribute(LIST_PARENT_ATTR)

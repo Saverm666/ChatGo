@@ -5,6 +5,9 @@ import { fileURLToPath, URL } from 'node:url'
 import manifest from './manifest.config'
 
 export default defineConfig({
+  // Content scripts run on the host website. Resolve lazy-loaded assets against
+  // the extension module URL instead of requesting /assets from that website.
+  base: './',
   plugins: [vue(), crx({ manifest })],
   resolve: {
     alias: {

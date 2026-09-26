@@ -8,6 +8,7 @@ import { readSettings, onStorageChanged, isExtensionContextInvalidatedError } fr
 import { CONTENT_MODULE_SETTING_KEYS, contentFeatureModules } from './modules/registry'
 
 let currentAdapter: SiteAdapter | null = null
+let settingsSyncGeneration = 0
 
 function disableAllModules(): void {
   contentFeatureModules.forEach((module) => module.disable())
@@ -31,7 +32,9 @@ function applySettings(settings: ChatGoSettings, adapter: SiteAdapter): void {
 }
 
 async function syncSettings(): Promise<void> {
+  const generation = ++settingsSyncGeneration
   const settings = await readSettings()
+  if (generation !== settingsSyncGeneration) return
   const adapter = resolveAdapter(new URL(window.location.href))
   applySettings(settings, adapter)
 }
@@ -72,7 +75,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return false
 })
 
-// document_start 立即初始化，让虚拟滚动样式赶在长对话首轮布局前生效。
+// 初始化站点功能与设置监听。
 function bootstrap(): void {
   syncSettings()
     .then(() => setupStorageListener())

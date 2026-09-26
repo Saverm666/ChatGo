@@ -39,11 +39,15 @@ defineEmits<{
         </CgIconButton>
       </div>
     </div>
-    <p>{{ truncateText(prompt.content, 120) }}</p>
+    <button
+      class="cg-prompt-card__content"
+      type="button"
+      :aria-label="`复制「${prompt.name || '未命名提示词'}」内容`"
+      @click="$emit('copy')"
+    >{{ truncateText(prompt.content, 120) }}</button>
     <div class="cg-prompt-card__meta">
-      <div class="cg-tag-row">
+      <div v-if="prompt.tags?.length" class="cg-tag-row">
         <span v-for="tag in (prompt.tags ?? []).slice(0, 4)" :key="tag" class="cg-tag">{{ tag }}</span>
-        <span v-if="(prompt.tags ?? []).length === 0" class="cg-tag cg-tag--muted">无标签</span>
       </div>
       <span class="cg-usage">{{ prompt.usedCount ?? 0 }} 次使用</span>
     </div>

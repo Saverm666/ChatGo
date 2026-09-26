@@ -5,8 +5,30 @@ const TEX_ANNOTATION_SELECTOR =
 const FORMULA_SELECTOR =
   ".katex, .katex-display, .katex-mathml, mjx-container, math, [role='math'], cib-math"
 const SOURCE_ATTRIBUTES = [
-  'data-latex', 'data-tex', 'data-formula', 'data-math', 'data-raw', 'raw'
+  'data-latex', 'data-tex', 'data-formula', 'data-math', 'data-raw', 'raw',
+  // 2026-09 登录态 ChatGPT 把原始 LaTeX 放在包裹 KaTeX 的
+  // <span class="block" data-math-source="\mathcal{L} = ..."> 上。
+  'data-math-source'
 ] as const
+
+export const FORMULA_SOURCE_ATTRIBUTES: readonly string[] = SOURCE_ATTRIBUTES
+
+// 站点常把原始 LaTeX 放在公式**祖先**元素的属性上而不是公式自身
+// （ChatGPT 登录态就是 <span data-math-source><span class="katex-display">…，
+// 属性在父级，必须向上看几层）。
+const SOURCE_ANCESTOR_DEPTH = 3
+
+/** 属性取源顺序：公式自身 → 至多 3 层祖先 → 容器内其它公式节点。 */
+export function sourceAttributeCandidates(container: Element): Element[] {
+  const candidates: Element[] = [container]
+  let ancestor: Element | null = container.parentElement
+  for (let depth = 0; ancestor && depth < SOURCE_ANCESTOR_DEPTH; depth += 1) {
+    candidates.push(ancestor)
+    ancestor = ancestor.parentElement
+  }
+  candidates.push(...Array.from(container.querySelectorAll(FORMULA_SELECTOR)))
+  return candidates
+}
 
 const MATH_OPERATOR_LATEX: Record<string, string> = {
   '→': '\\to', '←': '\\leftarrow', '↔': '\\leftrightarrow',
@@ -601,8 +623,7 @@ export function katexHtmlElementToLatex(container: Element): string | null {
 }
 
 function findAttributeSource(container: Element): string | null {
-  const candidates = [container, ...Array.from(container.querySelectorAll(FORMULA_SELECTOR))]
-  for (const candidate of candidates) {
+  for (const candidate of sourceAttributeCandidates(container)) {
     for (const attribute of SOURCE_ATTRIBUTES) {
       const source = normalizeLatexCandidate(candidate.getAttribute(attribute))
       if (source) return source

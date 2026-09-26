@@ -45,11 +45,9 @@ export const DEFAULT_SETTINGS: ChatGoSettings = {
   markdownCopyEnabled: true,
   markdownFormulaWrapMode: 'with-delimiters',
   enterEnhancerEnabled: true,
-  virtualScrollEnabled: true,
-  collapseEnabled: false,
-  collapseKeepLatest: 20,
   branchEnabled: true,
   floatingPanelEnabled: true,
+  conversationNavigatorEnabled: true,
   floatingPanelPosition: null
 }
 

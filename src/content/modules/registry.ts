@@ -4,9 +4,9 @@ import type { ChatGoSettings, SiteAdapter } from '@/main/types'
 import { formulaCopier } from './formula-copier'
 import { markdownCopy } from './markdown-copy'
 import { enterEnhancer } from './enter-enhancer'
-import { collapse } from './collapse'
 import { branch } from './branch'
 import { floatingPanel } from './floating-panel'
+import { conversationNavigator } from './conversation-navigator'
 
 export type ContentFeatureModule = {
   name: string
@@ -55,18 +55,6 @@ export const contentFeatureModules: ContentFeatureModule[] = [
     disable: () => enterEnhancer.disable()
   },
   {
-    name: '长对话虚拟滚动',
-    settingKeys: ['virtualScrollEnabled'],
-    async apply(settings, adapter) {
-      if (settings.virtualScrollEnabled) {
-        await collapse.enable(adapter)
-      } else {
-        collapse.disable()
-      }
-    },
-    disable: () => collapse.disable()
-  },
-  {
     name: '分支提问',
     settingKeys: ['branchEnabled'],
     apply(settings, adapter) {
@@ -77,6 +65,18 @@ export const contentFeatureModules: ContentFeatureModule[] = [
       }
     },
     disable: () => branch.disable()
+  },
+  {
+    name: '对话节点导航',
+    settingKeys: ['conversationNavigatorEnabled'],
+    apply(settings, adapter) {
+      if (settings.conversationNavigatorEnabled && adapter.id === 'chatgpt') {
+        conversationNavigator.enable(adapter)
+      } else {
+        conversationNavigator.disable()
+      }
+    },
+    disable: () => conversationNavigator.disable()
   },
   {
     name: '悬浮窗',

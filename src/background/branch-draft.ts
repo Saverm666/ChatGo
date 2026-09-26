@@ -29,3 +29,58 @@ export function canTabConsumeBranchDraft(
     currentTabId === draft.targetTabId
   )
 }
+
+export interface NativeBranchConsumer {
+  tabId?: number
+  openerTabId?: number
+  url?: string
+}
+
+// 原生分支（Gemini / ChatGPT 新版外壳）会把分支结果放进当前标签页的 SPA 路由
+// 或一个新标签页，两种情况都要求消费方来自源标签页本身或其 opener。
+export function canTabConsumeNativeBranchDraft(
+  draft: BranchPromptDraft,
+  consumer: NativeBranchConsumer,
+  options: { strategies: readonly string[]; hostname: string }
+): boolean {
+  if (!draft.strategy || !options.strategies.includes(draft.strategy)) return false
+  if (
+    consumer.tabId !== draft.sourceTabId &&
+    consumer.openerTabId !== draft.sourceTabId
+  ) {
+    return false
+  }
+
+  try {
+    const sourceUrl = new URL(draft.sourceUrl)
+    const targetUrl = new URL(consumer.url ?? '')
+    return (
+      sourceUrl.protocol === 'https:' &&
+      sourceUrl.hostname === options.hostname &&
+      targetUrl.origin === sourceUrl.origin &&
+      `${targetUrl.pathname}${targetUrl.search}` !== `${sourceUrl.pathname}${sourceUrl.search}`
+    )
+  } catch {
+    return false
+  }
+}
+
+export function canTabConsumeNativeGeminiDraft(
+  draft: BranchPromptDraft,
+  consumer: NativeBranchConsumer
+): boolean {
+  return canTabConsumeNativeBranchDraft(draft, consumer, {
+    strategies: ['native-gemini'],
+    hostname: 'gemini.google.com'
+  })
+}
+
+export function canTabConsumeNativeChatGptDraft(
+  draft: BranchPromptDraft,
+  consumer: NativeBranchConsumer
+): boolean {
+  return canTabConsumeNativeBranchDraft(draft, consumer, {
+    strategies: ['native-chatgpt'],
+    hostname: 'chatgpt.com'
+  })
+}

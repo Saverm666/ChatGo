@@ -49,11 +49,16 @@ export interface FormulaHistoryEntry {
 // 分支提问草稿（service-worker 中转）
 export interface BranchPromptDraft {
   text: string
+  nativeQuote?: {
+    label: string
+    markdown: string
+  }
   sourceTurnId: string
   sourcePath: string
   sourceUrl: string
   sourceTabId: number
   targetTabId?: number
+  strategy?: 'linked-tab' | 'native-gemini' | 'native-chatgpt'
   createdAt: number
 }
 
@@ -66,6 +71,7 @@ export interface SiteSelectors {
   composer?: string
   sendButton?: string
   formulaContainer?: string
+  nativeConversationNavigator?: string
 }
 
 // 站点适配器接口
@@ -88,11 +94,9 @@ export interface ChatGoSettings {
   markdownCopyEnabled: boolean
   markdownFormulaWrapMode: MarkdownFormulaWrapMode
   enterEnhancerEnabled: boolean
-  virtualScrollEnabled: boolean
-  collapseEnabled: boolean
-  collapseKeepLatest: number
   branchEnabled: boolean
   floatingPanelEnabled: boolean
+  conversationNavigatorEnabled: boolean
   floatingPanelPosition: FloatingPanelPosition | null
 }
 

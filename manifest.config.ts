@@ -11,7 +11,7 @@ const supportedSiteMatches = [
 export default defineManifest({
   manifest_version: 3,
   name: 'ChatGo',
-  description: '为多家 AI 聊天站点提供公式复制、Markdown 复制、提示词收藏、长对话折叠、分支提问与输入增强。',
+  description: '为多家 AI 聊天站点提供公式复制、Markdown 复制、提示词收藏、对话导航、分支提问与输入增强。',
   version: pkg.version,
   icons: {
     '16': 'src/assets/icons/icon16.png',
@@ -41,6 +41,12 @@ export default defineManifest({
     }
   ],
   content_scripts: [
+    {
+      matches: ['https://chatgpt.com/*'],
+      js: ['src/content/chatgpt-native-bridge.ts'],
+      run_at: 'document_start',
+      world: 'MAIN'
+    },
     {
       matches: supportedSiteMatches,
       js: ['src/content/index.ts'],

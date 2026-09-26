@@ -24,6 +24,11 @@ let currentAdapter: SiteAdapter | null = null
 let panelLoadPromise: Promise<void> | null = null
 let bootstrapCleanup: (() => void) | null = null
 let bootstrapPositionRatio: FloatingRatio = getDefaultFloatingRatio()
+let runtimePreloadId: number | null = null
+let enablePromise: Promise<void> | null = null
+let enableController: AbortController | null = null
+let generation = 0
+let editorGeneration = 0
 
 let editorApp: App | null = null
 let editorHost: HTMLDivElement | null = null
@@ -55,6 +60,14 @@ function getFloatingRuntime(): Promise<FloatingRuntime> {
     throw error
   })
   return runtimePromise
+}
+
+function preloadFloatingRuntime(): void {
+  if (runtimePreloadId !== null) return
+  runtimePreloadId = window.requestIdleCallback(() => {
+    runtimePreloadId = null
+    if (mounted) getFloatingRuntime().catch(() => {})
+  })
 }
 
 async function loadEditorRuntime() {
@@ -124,24 +137,24 @@ const HOST_VARS_CSS = `
 `
 
 // 等待 body 可用（content script 在 document_start 注入时 body 可能不存在）
-function waitForBody(): Promise<void> {
+function waitForBody(signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
-    if (document.body) {
+    if (document.body || signal.aborted) {
       resolve()
       return
     }
-    const observer = new MutationObserver(() => {
-      if (document.body) {
-        observer.disconnect()
-        resolve()
-      }
-    })
-    observer.observe(document.documentElement, { childList: true })
-    // 兜底超时
-    window.setTimeout(() => {
+    let timer: number | undefined
+    const finish = () => {
       observer.disconnect()
+      window.clearTimeout(timer)
+      signal.removeEventListener('abort', finish)
       resolve()
-    }, 5000)
+    }
+    const observer = new MutationObserver(() => { if (document.body) finish() })
+    observer.observe(document.documentElement, { childList: true })
+    signal.addEventListener('abort', finish, { once: true })
+    // 兜底超时
+    timer = window.setTimeout(finish, 5000)
   })
 }
 
@@ -319,9 +332,10 @@ function mountBootstrapButton(root: ShadowRoot, initialRatio: FloatingRatio): vo
 
 async function mountPanel(initialExpanded: boolean): Promise<void> {
   if (app || panelLoadPromise) return panelLoadPromise ?? Promise.resolve()
-  panelLoadPromise = (async () => {
+  const currentGeneration = generation
+  const pending = (async () => {
     const runtime = await getFloatingRuntime()
-    if (!mounted || !shadow || !currentAdapter) return
+    if (currentGeneration !== generation || !mounted || !shadow || !currentAdapter) return
     bootstrapCleanup?.()
     shadow.replaceChildren()
     injectShadowStyles(shadow, runtime.floatingStyles)
@@ -336,15 +350,18 @@ async function mountPanel(initialExpanded: boolean): Promise<void> {
     app.use(runtime.createPinia())
     app.mount(mountPoint)
   })().finally(() => {
-    panelLoadPromise = null
+    if (panelLoadPromise === pending) panelLoadPromise = null
   })
+  panelLoadPromise = pending
   return panelLoadPromise
 }
 
 async function mountEditor(payload: OpenEditorPayload): Promise<void> {
   if (editorHost) return
+  const currentGeneration = generation
+  const currentEditorGeneration = ++editorGeneration
   const { runtime, PromptEditor, katexStyles } = await getEditorRuntime()
-  if (!mounted || editorHost) return
+  if (currentGeneration !== generation || currentEditorGeneration !== editorGeneration || !mounted || editorHost) return
   editorHost = document.createElement('div')
   editorHost.id = 'chatgo-editor-host'
   editorHost.className = 'chatgo-editor-root'
@@ -364,6 +381,7 @@ async function mountEditor(payload: OpenEditorPayload): Promise<void> {
 }
 
 function unmountEditor(): void {
+  editorGeneration += 1
   if (!editorHost) return
   editorApp?.unmount()
   editorApp = null
@@ -384,40 +402,63 @@ function handleEditorBridge(payload: OpenEditorPayload | null): void {
 export const floatingPanel = {
   async enable(adapter: SiteAdapter): Promise<void> {
     if (mounted) return
+    if (enablePromise) return enablePromise
+    const controller = new AbortController()
+    enableController = controller
+    const currentGeneration = generation
+    const pending = (async () => {
+      const settings = await readSettings()
+      if (controller.signal.aborted || !settings.floatingPanelEnabled) return
 
-    const settings = await readSettings()
-    if (!settings.floatingPanelEnabled) return
+      // 等 body 与保存位置并行读取，避免轻量按钮先出现在错误位置再跳动。
+      const [, storedPosition] = await Promise.all([waitForBody(controller.signal), readFloatingPosition()])
+      if (controller.signal.aborted || !document.body) return
+      const ratio = await resolveBootstrapRatio(storedPosition)
+      if (controller.signal.aborted || currentGeneration !== generation) return
+      bootstrapPositionRatio = ratio
 
-    // 等 body 与保存位置并行读取，避免轻量按钮先出现在错误位置再跳动。
-    const [, storedPosition] = await Promise.all([waitForBody(), readFloatingPosition()])
-    bootstrapPositionRatio = await resolveBootstrapRatio(storedPosition)
+      host = document.createElement('div')
+      host.id = 'chatgo-floating-host'
+      host.className = 'chatgo-floating-root'
+      // 脱离文档流，避免影响页面布局/滚动条
+      host.style.cssText = 'all: initial; position: fixed; inset: 0; width: 100vw; height: 100vh; margin: 0; padding: 0; border: 0; z-index: 2147483647; pointer-events: none; overflow: visible;'
+      document.body.appendChild(host)
+      shadow = host.attachShadow({ mode: 'open' })
+      currentAdapter = adapter
+      mountBootstrapButton(shadow, bootstrapPositionRatio)
+      mounted = true
+      preloadFloatingRuntime()
 
-    host = document.createElement('div')
-    host.id = 'chatgo-floating-host'
-    host.className = 'chatgo-floating-root'
-    // 脱离文档流，避免影响页面布局/滚动条
-    host.style.cssText = 'all: initial; position: fixed; inset: 0; width: 100vw; height: 100vh; margin: 0; padding: 0; border: 0; z-index: 2147483647; pointer-events: none; overflow: visible;'
-    document.body.appendChild(host)
-    shadow = host.attachShadow({ mode: 'open' })
-    currentAdapter = adapter
-    mountBootstrapButton(shadow, bootstrapPositionRatio)
-    mounted = true
+      unsubBridge = editorBridge.on(handleEditorBridge)
 
-    unsubBridge = editorBridge.on(handleEditorBridge)
-
-    // 监听设置变化，开关悬浮窗
-    unsubStorage = onStorageChanged((changes, area) => {
-      if (area !== 'local') return
-      if ('floatingPanelEnabled' in changes) {
-        const next = changes.floatingPanelEnabled?.newValue
-        if (next === false) this.disable()
+      // 监听设置变化，开关悬浮窗
+      unsubStorage = onStorageChanged((changes, area) => {
+        if (area !== 'local') return
+        if ('floatingPanelEnabled' in changes) {
+          const next = changes.floatingPanelEnabled?.newValue
+          if (next === false) this.disable()
+        }
+      })
+      console.log('[ChatGo] 悬浮窗已挂载。')
+    })().finally(() => {
+      if (enablePromise === pending) {
+        enablePromise = null
+        enableController = null
       }
     })
-    console.log('[ChatGo] 悬浮窗已挂载。')
+    enablePromise = pending
+    return pending
   },
 
   disable(): void {
-    if (!mounted) return
+    generation += 1
+    enableController?.abort()
+    enableController = null
+    enablePromise = null
+    if (runtimePreloadId !== null) {
+      window.cancelIdleCallback(runtimePreloadId)
+      runtimePreloadId = null
+    }
     unsubStorage?.()
     unsubStorage = null
     unsubBridge?.()

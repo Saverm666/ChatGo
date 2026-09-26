@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onBeforeUnmount, onMounted } from 'vue'
+import { computed, nextTick, ref, onBeforeUnmount, onMounted } from 'vue'
 import {
   Bookmark,
   Check,
@@ -50,6 +50,7 @@ const promptStatus = ref('')
 const editorPayload = ref<OpenEditorPayload | null>(null)
 const siteWhitelistInput = ref('')
 const siteBlacklistInput = ref('')
+const activeSection = ref('prompts')
 let unsubEditor: (() => void) | null = null
 
 const navItems = [
@@ -216,7 +217,16 @@ async function clearHistory(): Promise<void> {
 
 onMounted(loadData)
 
+async function syncActiveSection(): Promise<void> {
+  const section = window.location.hash.slice(1)
+  activeSection.value = navItems.some((item) => item.id === section) ? section : 'prompts'
+  await nextTick()
+  window.scrollTo({ top: 0, behavior: 'instant' })
+}
+
 onMounted(() => {
+  syncActiveSection()
+  window.addEventListener('hashchange', syncActiveSection)
   unsubEditor = editorBridge.on((payload) => {
     editorPayload.value = payload
     if (!payload) loadData().catch(() => {})
@@ -224,6 +234,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('hashchange', syncActiveSection)
   unsubEditor?.()
 })
 </script>
@@ -246,7 +257,14 @@ onBeforeUnmount(() => {
       </div>
 
       <nav class="nav-links">
-        <a v-for="item in navItems" :key="item.id" :href="`#${item.id}`" class="nav-link">
+        <a
+          v-for="item in navItems"
+          :key="item.id"
+          :href="`#${item.id}`"
+          class="nav-link"
+          :class="{ 'nav-link--active': activeSection === item.id }"
+          :aria-current="activeSection === item.id ? 'page' : undefined"
+        >
           <component :is="item.icon" aria-hidden="true" :size="17" :stroke-width="2" />
           <span>{{ item.label }}</span>
         </a>
@@ -256,8 +274,8 @@ onBeforeUnmount(() => {
     <main class="settings-main">
       <header class="page-head">
         <div>
-          <p class="eyebrow">ChatGo Settings</p>
-          <h2>设置</h2>
+          <p class="eyebrow">CHATGO / CONTROL CENTER</p>
+          <h2>设置与收藏</h2>
         </div>
         <span v-if="saveStatus" class="status-pill">
           <Check aria-hidden="true" :size="14" :stroke-width="2.4" />
@@ -265,7 +283,7 @@ onBeforeUnmount(() => {
         </span>
       </header>
 
-      <section id="prompts" class="settings-section">
+      <section v-if="activeSection === 'prompts'" class="settings-section" aria-label="提示词">
         <div class="section-head section-head--action">
           <div class="section-head__title">
             <Bookmark aria-hidden="true" :size="20" :stroke-width="2" />
@@ -321,7 +339,7 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <section id="history" class="settings-section">
+      <section v-if="activeSection === 'history'" class="settings-section" aria-label="公式历史">
         <div class="section-head section-head--action">
           <div class="section-head__title">
             <History aria-hidden="true" :size="20" :stroke-width="2" />
@@ -364,7 +382,7 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <section v-if="settings" id="formats" class="settings-section">
+      <section v-if="settings && activeSection === 'formats'" class="settings-section" aria-label="复制格式">
         <div class="section-head">
           <Clipboard aria-hidden="true" :size="20" :stroke-width="2" />
           <div>
@@ -407,7 +425,7 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <section v-if="settings" id="features" class="settings-section">
+      <section v-if="settings && activeSection === 'features'" class="settings-section" aria-label="功能开关">
         <div class="section-head">
           <Settings2 aria-hidden="true" :size="20" :stroke-width="2" />
           <div>
@@ -436,16 +454,16 @@ onBeforeUnmount(() => {
             @update:model-value="update('enterEnhancerEnabled', $event)"
           />
           <ToggleRow
-            v-model="settings.virtualScrollEnabled"
-            label="长对话虚拟滚动"
-            hint="离屏消息停止布局和绘制，滚动接近时自动恢复"
-            @update:model-value="update('virtualScrollEnabled', $event)"
-          />
-          <ToggleRow
             v-model="settings.branchEnabled"
             label="分支提问"
             hint="选区转引用，在新对话页打开"
             @update:model-value="update('branchEnabled', $event)"
+          />
+          <ToggleRow
+            v-model="settings.conversationNavigatorEnabled"
+            label="对话节点导航"
+            hint="至少两条提问时显示；官方目录出现时自动隐藏"
+            @update:model-value="update('conversationNavigatorEnabled', $event)"
           />
           <ToggleRow
             v-model="settings.floatingPanelEnabled"
@@ -456,7 +474,7 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <section v-if="settings" id="sites" class="settings-section">
+      <section v-if="settings && activeSection === 'sites'" class="settings-section" aria-label="支持站点">
         <div class="section-head">
           <Globe2 aria-hidden="true" :size="20" :stroke-width="2" />
           <div>
@@ -544,12 +562,12 @@ onBeforeUnmount(() => {
   --cg-panel-blue: var(--cg-accent-600);
   --cg-panel-blue-soft: var(--cg-accent-subtle);
   --cg-panel-danger: #DC2626;
-  width: 60vw;
+  width: min(1180px, calc(100% - 64px));
   margin: 0 auto;
-  padding: 34px 0 48px;
+  padding: 32px 0 56px;
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 34px;
+  grid-template-columns: 218px minmax(0, 1fr);
+  gap: 28px;
   font-family: var(--cg-font-body);
   color: var(--cg-text);
 }
@@ -561,12 +579,18 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 22px;
+  padding: 20px 12px 16px;
+  background: #FFFFFF;
+  border: 1px solid #E5EBF4;
+  border-radius: 18px;
+  box-shadow: 0 8px 28px rgba(31, 55, 92, 0.04);
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 0 8px;
 }
 
 .brand__mark {
@@ -585,7 +609,8 @@ onBeforeUnmount(() => {
 
 .brand h1 {
   margin: 0;
-  font-size: 18px;
+  font-family: var(--cg-font-display);
+  font-size: 20px;
   font-weight: 760;
   line-height: 1.1;
 }
@@ -599,25 +624,21 @@ onBeforeUnmount(() => {
 .nav-links {
   display: flex;
   flex-direction: column;
-  border-top: 1px solid var(--cg-border);
-  border-bottom: 1px solid var(--cg-border);
+  gap: 3px;
 }
 
 .nav-link {
-  min-height: 42px;
+  min-height: 40px;
   color: #667085;
   text-decoration: none;
   display: flex;
   align-items: center;
   gap: 10px;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.72);
+  border-radius: 10px;
+  padding: 0 12px;
   font-size: 13px;
   font-weight: 680;
   transition: color 140ms ease, background 140ms ease;
-}
-
-.nav-link:last-child {
-  border-bottom: none;
 }
 
 .nav-link:hover {
@@ -625,36 +646,48 @@ onBeforeUnmount(() => {
   background: rgba(239, 246, 255, 0.48);
 }
 
+.nav-link--active {
+  background: #EFF6FF;
+  color: #1D4ED8;
+}
+
+.nav-link--active svg { color: #2563EB; }
+
+.nav-link:focus-visible { outline: 2px solid #3B82F6; outline-offset: 2px; }
+
 .nav-link svg {
   width: 17px;
   height: 17px;
 }
 
 .settings-main {
+  width: 100%;
   min-width: 0;
   display: flex;
   flex-direction: column;
+  gap: 16px;
 }
 
 .page-head {
-  min-height: 86px;
+  min-height: 78px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  border-bottom: 1px solid var(--cg-border);
-  margin-bottom: 6px;
+  padding: 8px 2px 0;
 }
 
 .eyebrow {
   margin: 0 0 6px;
   color: var(--cg-accent-600);
-  font-size: 12px;
+  font: 700 11px/1.2 var(--cg-font-mono);
+  letter-spacing: 0.06em;
   font-weight: 760;
 }
 
 .page-head h2 {
   margin: 0;
+  font-family: var(--cg-font-display);
   font-size: 30px;
   line-height: 1.1;
   font-weight: 780;
@@ -676,16 +709,20 @@ onBeforeUnmount(() => {
 }
 
 .settings-section {
-  scroll-margin-top: 28px;
-  padding: 28px 0;
-  border-bottom: 1px solid var(--cg-border);
+  width: 100%;
+  min-width: 0;
+  padding: 24px 26px;
+  border: 1px solid #E5EBF4;
+  border-radius: 18px;
+  background: #FFFFFF;
+  box-shadow: 0 8px 28px rgba(31, 55, 92, 0.035);
   display: flex;
   flex-direction: column;
   gap: 18px;
 }
 
 .settings-section:last-child {
-  border-bottom: none;
+  border-bottom: 1px solid #E5EBF4;
 }
 
 .section-head,
@@ -703,13 +740,18 @@ onBeforeUnmount(() => {
 .section-head > svg,
 .section-head__title > svg {
   color: var(--cg-accent-600);
-  margin-top: 2px;
+  margin-top: 0;
   flex-shrink: 0;
+  box-sizing: content-box;
+  padding: 8px;
+  border-radius: 10px;
+  background: #EFF6FF;
 }
 
 .section-head h3 {
   margin: 0;
-  font-size: 18px;
+  font-family: var(--cg-font-display);
+  font-size: 19px;
   font-weight: 760;
   letter-spacing: -0.01em;
 }
@@ -787,8 +829,8 @@ onBeforeUnmount(() => {
 .option-list-shell {
   display: flex;
   flex-direction: column;
-  border-top: 1px solid rgba(226, 232, 240, 0.9);
-  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  border-top: 1px solid #EDF1F6;
+  border-bottom: 1px solid #EDF1F6;
 }
 
 .empty-state {
@@ -1015,13 +1057,9 @@ onBeforeUnmount(() => {
   line-height: 1.45;
 }
 
-:global(html) {
-  scroll-behavior: smooth;
-}
-
 @media (max-width: 900px) {
   .settings-shell {
-    width: min(760px, calc(100vw - 32px));
+    width: min(760px, calc(100% - 32px));
     grid-template-columns: 1fr;
     gap: 22px;
   }
@@ -1031,8 +1069,8 @@ onBeforeUnmount(() => {
   }
 
   .nav-links {
-    overflow-x: auto;
     flex-direction: row;
+    flex-wrap: wrap;
     border: none;
     gap: 8px;
     padding-bottom: 2px;
@@ -1067,7 +1105,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 560px) {
   .settings-shell {
-    width: calc(100vw - 24px);
+    width: calc(100% - 24px);
     padding-top: 22px;
   }
 

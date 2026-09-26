@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { identifyKatexXArrowCommand, mathMlElementToLatex } from './formula-source.ts'
+import {
+  FORMULA_SOURCE_ATTRIBUTES,
+  identifyKatexXArrowCommand,
+  mathMlElementToLatex,
+  sourceAttributeCandidates
+} from './formula-source.ts'
 
 class FakeMathElement {
   tagName: string
@@ -135,4 +140,44 @@ test('identifies KaTeX extensible arrows from their current SVG paths', () => {
 
 test('does not guess an extensible-arrow command for an unknown SVG', () => {
   assert.equal(identifyKatexXArrowCommand(['M1 2L3 4']), null)
+})
+
+// 2026-09 登录态 ChatGPT 把原始 LaTeX 放在包裹 KaTeX 的祖先元素上：
+// <span class="block" data-math-source="\mathcal{L} = …"><span class="katex-display">…
+test('属性取源包含 ChatGPT 登录态的 data-math-source', () => {
+  assert.ok(FORMULA_SOURCE_ATTRIBUTES.includes('data-math-source'))
+})
+
+test('属性取源顺序为 自身 → 祖先(至多 3 层) → 容器内公式节点', () => {
+  const greatGrandparent = el('span')
+  const grandparent = el('span')
+  const parent = el('span', '', [], { 'data-math-source': '\\mathcal{L} = 1' })
+  const self = el('span')
+  const fake = self as unknown as { parentElement: Element | null; querySelectorAll: () => Element[] }
+  fake.parentElement = parent as unknown as Element
+  ;(parent as unknown as { parentElement: Element | null }).parentElement =
+    grandparent as unknown as Element
+  ;(grandparent as unknown as { parentElement: Element | null }).parentElement =
+    greatGrandparent as unknown as Element
+  fake.querySelectorAll = () => []
+
+  assert.deepEqual(sourceAttributeCandidates(self), [self, parent, grandparent, greatGrandparent])
+})
+
+test('祖先超过 3 层后不再继续向上取源', () => {
+  const ancestors = [el('span'), el('span'), el('span'), el('span'), el('span')]
+  const self = el('span')
+  const fake = self as unknown as { parentElement: Element | null; querySelectorAll: () => Element[] }
+  fake.querySelectorAll = () => []
+  let current: { parentElement: Element | null } = fake
+  for (const ancestor of ancestors) {
+    current.parentElement = ancestor as unknown as Element
+    current = ancestor as unknown as { parentElement: Element | null }
+  }
+  assert.deepEqual(sourceAttributeCandidates(self), [
+    self,
+    ancestors[0],
+    ancestors[1],
+    ancestors[2]
+  ])
 })
