@@ -48,6 +48,7 @@ export interface FormulaHistoryEntry {
 
 // 分支提问草稿（service-worker 中转）
 export interface BranchPromptDraft {
+  diagnosticId?: string
   text: string
   nativeQuote?: {
     label: string

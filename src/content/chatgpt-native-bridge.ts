@@ -1,5 +1,7 @@
 import { findNativeComposer, hasNativeAttachmentPreview, hasNewNativeQuoteText, matchingNativeQuoteElements, nativeComposerContainer } from './sites/chatgpt-native'
-import { addNativeAttachment, attachmentApiFromRuntime, conversationIdFromUrl, findComposerScope, runtimeUrlFromSource } from './modules/chatgpt-native-runtime'
+import { addNativeAttachment, attachmentApiFromRuntime, conversationIdFromUrl, findComposerScope } from './modules/chatgpt-native-runtime'
+import { discoverAttachmentApi, type NativeLoadReport } from './modules/chatgpt-native-loader'
+import { version } from '../../package.json'
 
 // 运行在 ChatGPT 页面的 MAIN world。调用网站自身的引用状态与提交转换函数，
 // 让卡片与提交内容都由原生实现管理。站点版本不兼容时由隔离世界回退到 Markdown。
@@ -87,6 +89,8 @@ function loadNativeFunctions(): Promise<ReturnType<typeof findNativeFunctions>> 
 }
 
 let attachmentApi: ReturnType<typeof attachmentApiFromRuntime> = null
+let attachmentLoadReport: NativeLoadReport | null = null
+const loadedRuntimes = new Map<string, unknown>()
 
 async function loadAttachmentApi(expiresAt: number) {
   if (attachmentApi) return attachmentApi
@@ -98,27 +102,20 @@ async function loadAttachmentApi(expiresAt: number) {
     ...performance.getEntriesByType('resource').map((entry) => entry.name),
     ...Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="modulepreload"]'), (link) => link.href)
   ])].filter((url) => {
-    const parsed = new URL(url)
-    return parsed.origin === location.origin && /^\/cdn\/assets\/[^/]+\.js$/.test(parsed.pathname)
-  }).slice(0, 8)
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), Math.max(0, Math.min(1400, expiresAt - Date.now())))
-  try {
-    const candidates = await Promise.all(urls.map(async (url) => {
-      try {
-        const response = await fetch(url, { cache: 'force-cache', signal: controller.signal })
-        if (!response.ok) return null
-        return runtimeUrlFromSource(await response.text(), url)
-      } catch { return null }
-    }))
-    for (const url of new Set(candidates)) {
-      if (!url || Date.now() >= expiresAt) continue
-      const runtime = await import(/* @vite-ignore */ url)
-      const api = attachmentApiFromRuntime(runtime)
-      if (api) return (attachmentApi = api)
-    }
-    return null
-  } finally { clearTimeout(timer) }
+    try {
+      const parsed = new URL(url)
+      return parsed.origin === location.origin && /^\/cdn\/assets\/[^/]+\.js$/.test(parsed.pathname)
+    } catch { return false }
+  })
+  const result = await discoverAttachmentApi(urls, expiresAt, async (url) => {
+    if (loadedRuntimes.has(url)) return loadedRuntimes.get(url)
+    const runtime = await import(/* @vite-ignore */ url)
+    loadedRuntimes.set(url, runtime)
+    return runtime
+  }, loadedRuntimes)
+  attachmentLoadReport = result.report
+  if (result.api) attachmentApi = result.api
+  return result.api
 }
 
 interface QuoteContext {
@@ -133,7 +130,7 @@ interface QuoteContext {
 async function attachCurrentNativeQuote(request: NativeQuoteRequest, context: QuoteContext): Promise<{ ok: boolean; reason?: string }> {
   const api = await loadAttachmentApi(request.expiresAt)
   if (!context.isCurrent()) return { ok: false }
-  if (!api) return { ok: false, reason: '当前页面的 Rspack 引用模块尚未找到或接口已变化。' }
+  if (!api) return { ok: false, reason: `原生模块解析失败（阶段：${attachmentLoadReport?.stage ?? 'unknown'}）。` }
   if (Date.now() >= request.expiresAt) return { ok: false, reason: '解析原生模块超时。' }
   const scope = findComposerScope(context.composer)
   const conversationId = conversationIdFromUrl(request.pageUrl)
@@ -144,7 +141,7 @@ async function attachCurrentNativeQuote(request: NativeQuoteRequest, context: Qu
     .map((element) => [element, element.textContent]))
   const rollback = addNativeAttachment(api, scope, conversationId, request.markdown)
   if (!rollback) return { ok: false, reason: '原生添加函数未写入已选文本附件。' }
-  const deadline = Math.min(request.expiresAt - 50, Date.now() + 600)
+  const deadline = Math.min(request.expiresAt - 100, Date.now() + 1600)
   let attached = false
   context.signal.addEventListener('abort', rollback, { once: true })
   try {
@@ -152,8 +149,10 @@ async function attachCurrentNativeQuote(request: NativeQuoteRequest, context: Qu
       await new Promise((resolve) => setTimeout(resolve, 40))
       if (!context.isCurrent() || Date.now() >= request.expiresAt) break
       if (!rollback.isPresent()) continue
-      // 卡片类名属于页面私有实现，容器改版后可能变样；此时退化为“出现了新的引用标题文本”。
-      const cardVisible = hasNativeAttachmentPreview(context.container, rollback.id, request.markdown) ||
+      // The new attachment ID is unique. It also identifies cards rendered in
+      // a sibling region or a portal outside the editor's nearest container.
+      const cardVisible = hasNativeAttachmentPreview(context.container, rollback.id) ||
+        hasNativeAttachmentPreview(context.composer.ownerDocument.body, rollback.id) ||
         hasNewNativeQuoteText(context.container, request.label, previousQuoteText)
       if (cardVisible) {
         attached = true
@@ -168,8 +167,28 @@ async function attachCurrentNativeQuote(request: NativeQuoteRequest, context: Qu
 }
 
 function respond(id: string, ok: boolean, reason?: string, cancelled = false): void {
+  if (!ok && !cancelled) console.info('[ChatGo] 原生引用诊断', { version, reason, loader: attachmentLoadReport })
   window.postMessage({ source: 'chatgo-page', type: RESULT_TYPE, id, ok, reason, cancelled }, window.location.origin)
 }
+
+// Read-only probe: no attachment or chat text is read or changed. It also proves
+// which extension build is running, independently of the Markdown fallback.
+window.addEventListener('message', (event: MessageEvent) => {
+  if (event.source !== window || event.origin !== location.origin) return
+  if (event.data?.source !== 'chatgo-content' || event.data.type !== 'chatgo:diagnose-native-quote' || typeof event.data.id !== 'string') return
+  const id = event.data.id
+  void (async () => {
+    const api = await loadAttachmentApi(Date.now() + 1600)
+    const composer = findNativeComposer()
+    window.postMessage({
+      source: 'chatgo-page', type: 'chatgo:diagnose-native-quote-result', id,
+      version, composer: Boolean(composer), appScope: Boolean(composer && findComposerScope(composer)),
+      conversation: Boolean(conversationIdFromUrl(location.href)), api: Boolean(api), loader: attachmentLoadReport
+    }, location.origin)
+  })().catch(() => {
+    window.postMessage({ source: 'chatgo-page', type: 'chatgo:diagnose-native-quote-result', id, version, error: '诊断执行失败' }, location.origin)
+  })
+})
 
 window.addEventListener('message', (event: MessageEvent<NativeQuoteRequest>) => {
   if (event.source !== window || event.origin !== window.location.origin) return

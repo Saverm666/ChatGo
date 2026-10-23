@@ -2,9 +2,9 @@
 
 import type { BranchPromptDraft, SiteAdapter } from '@/main/types'
 import { readSettings } from '@/main/storage'
+import { isGeminiBranchDestination } from '@/main/gemini-route'
 import { sendRuntimeMessage } from '@/main/messaging'
 import {
-  dispatchUserClick,
   listSelectorAlternatives,
   waitForValue
 } from '@/main/utils'
@@ -18,11 +18,9 @@ import {
   getChatGptBranchScopeFromUrl,
   isLocalChatGptConversationUrl
 } from './chatgpt-branch-route'
-import {
-  findGeminiBranchMenuItem,
-  findGeminiMoreOptionsButton,
-  findGeminiResponseElement
-} from './gemini-native-branch'
+import { requestGeminiBranch } from './gemini-native-branch'
+import { findGeminiBranchSource } from '../sites/gemini'
+import { beginBranchDiagnostic, markBranchDiagnostic } from './branch-diagnostics'
 
 const BRANCH_BUTTON_IDLE_LABEL = '分支提问'
 const CHAT_BRANCH_LABEL = '对话分支'
@@ -56,6 +54,7 @@ let selectionRefreshFrame: number | null = null
 let actionInFlight = false
 let consumeInFlight = false
 let consumeController: AbortController | null = null
+let geminiBranchController: AbortController | null = null
 let errorResetTimer: number | null = null
 let mouseSelectionInProgress = false
 let mouseSelectionChanged = false
@@ -710,17 +709,31 @@ async function consumePendingBranchDraft(): Promise<void> {
   consumeInFlight = true
   const controller = new AbortController()
   consumeController = controller
+  let diagnosticId: string | undefined
   try {
-    const result = await sendRuntimeMessage<Pick<BranchPromptDraft, 'text' | 'strategy' | 'sourceTurnId' | 'nativeQuote'>>({
+    const result = await sendRuntimeMessage<Pick<BranchPromptDraft, 'text' | 'strategy' | 'sourceTurnId' | 'nativeQuote' | 'diagnosticId'>>({
       type: 'CONSUME_BRANCH_DRAFT'
     })
     if (controller.signal.aborted || !result.ok || !result.data?.text) return
+    diagnosticId = result.data.diagnosticId
+    markBranchDiagnostic(diagnosticId, 'target.draft-received')
+    const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
+    if (nav) {
+      for (const key of ['requestStart', 'responseStart', 'responseEnd', 'domInteractive', 'domContentLoadedEventEnd'] as const) {
+        if (nav[key] > 0) markBranchDiagnostic(diagnosticId, `target.navigation.${key}`, nav[key], performance.timeOrigin + nav[key])
+      }
+    }
+    markBranchDiagnostic(diagnosticId, 'target.composer-wait-start')
     const composer = await waitForValue(() => findComposer(), {
       timeoutMs: 15000,
       intervalMs: 100,
       signal: controller.signal
     })
-    if (!composer || controller.signal.aborted) return
+    if (!composer || controller.signal.aborted) {
+      markBranchDiagnostic(diagnosticId, 'target.composer-timeout-or-cancelled')
+      return
+    }
+    markBranchDiagnostic(diagnosticId, 'target.composer-ready')
     const destinationUrl = location.href
     const isCurrent = () => !controller.signal.aborted && enabled && composer.isConnected &&
       location.href === destinationUrl && findComposer() === composer
@@ -741,11 +754,17 @@ async function consumePendingBranchDraft(): Promise<void> {
         }
       }
     }
-    if (!isCurrent()) return
+    if (!isCurrent()) {
+      markBranchDiagnostic(diagnosticId, 'target.context-changed')
+      return
+    }
+    markBranchDiagnostic(diagnosticId, 'target.insert-start')
     const inserted = composerContainsText(result.data.text, composer)
       || await insertTextIntoComposer(composer, result.data.text)
     if (!inserted) console.warn('[ChatGo] 未能把选区写入新对话输入框。')
+    markBranchDiagnostic(diagnosticId, inserted ? 'target.insert-confirmed' : 'target.insert-failed')
   } catch (error) {
+    markBranchDiagnostic(diagnosticId, 'target.failed')
     console.error('[ChatGo] 自动填充分支草稿失败。', error)
   } finally {
     if (consumeController === controller) {
@@ -789,58 +808,48 @@ async function openChatGptBranchRoute(
   }
 }
 
-async function openGeminiNativeBranch(snapshot: SelectionSnapshot): Promise<void> {  const response = findGeminiResponseElement(snapshot.turn)
-  if (!response) {
-    throw new Error('请在 Gemini 的回复内容中选择文本后再创建分支。')
-  }
-
-  const moreOptionsButton = findGeminiMoreOptionsButton(response)
-  if (!moreOptionsButton) {
-    throw new Error('未找到这条 Gemini 回复的“更多选项”按钮。')
-  }
-
-  dispatchUserClick(moreOptionsButton)
-  const branchMenuItem = await waitForValue(() => findGeminiBranchMenuItem(), {
-    timeoutMs: 3000,
-    intervalMs: 80
-  })
-  if (!branchMenuItem) {
-    throw new Error('Gemini 未显示原生分支功能，请确认已登录且该账号支持此功能。')
-  }
-
-  const sourceUrl = window.location.href
-  const draftText = formatBranchQuotedMarkdown(snapshot.markdown)
-  const saveResult = await sendRuntimeMessage({
-    type: 'CREATE_BRANCH_DRAFT',
-    draft: {
-      text: draftText,
-      sourceTurnId: snapshot.messageId ?? (response.id || `${Date.now()}`),
-      sourcePath: window.location.pathname,
-      sourceUrl,
-      strategy: 'native-gemini',
-      createdAt: Date.now()
-    }
-  })
-  if (!saveResult.ok) throw new Error(saveResult.error ?? '保存 Gemini 分支草稿失败。')
-
+async function openGeminiNativeBranch(snapshot: SelectionSnapshot): Promise<void> {
+  const diagnosticId = await beginBranchDiagnostic()
+  const sourceUrl = location.href
+  const source = findGeminiBranchSource(snapshot.turn, sourceUrl)
+  if (!source) throw new Error('未能从当前 Gemini 回复解析会话与轮次 ID，请刷新页面后重试。')
+  markBranchDiagnostic(diagnosticId, 'source.identity-parsed')
+  const controller = new AbortController()
+  geminiBranchController = controller
+  let draftSaved = false
   try {
-    dispatchUserClick(branchMenuItem)
+    const branchUrl = await requestGeminiBranch(source, controller.signal, diagnosticId)
+    if (controller.signal.aborted || !enabled || location.href !== sourceUrl) return
+    if (!isGeminiBranchDestination(sourceUrl, branchUrl)) throw new Error('Gemini 返回的分支地址无效。')
+    markBranchDiagnostic(diagnosticId, 'source.save-draft-start')
+    const saved = await sendRuntimeMessage({
+      type: 'CREATE_BRANCH_DRAFT',
+      draft: {
+        text: formatBranchQuotedMarkdown(snapshot.markdown),
+        sourceTurnId: source.turnId, sourcePath: location.pathname,
+        sourceUrl, strategy: 'native-gemini', createdAt: Date.now(), diagnosticId
+      }
+    })
+    if (!saved.ok) throw new Error(saved.error ?? '保存 Gemini 分支草稿失败。')
+    markBranchDiagnostic(diagnosticId, 'source.save-draft-end')
+    draftSaved = true
+    if (controller.signal.aborted || !enabled || location.href !== sourceUrl) {
+      await sendRuntimeMessage({ type: 'CLEAR_BRANCH_DRAFT' })
+      return
+    }
+    // The background binds the draft to a newly created tab before navigating.
+    // Never click a native menu, invoke the site router, or fill the source tab.
+    markBranchDiagnostic(diagnosticId, 'source.open-tab-start')
+    const opened = await sendRuntimeMessage({ type: 'OPEN_BRANCH_TAB', url: branchUrl })
+    markBranchDiagnostic(diagnosticId, 'source.open-tab-end')
+    if (!opened.ok) throw new Error(opened.error ?? '打开 Gemini 分支标签页失败。')
     hideUi()
-
-    // Gemini 可能在当前标签页内通过 SPA 路由进入分支，也可能打开新标签页。
-    // 当前标签页路由时直接回填；新标签页则由后台校验 opener 后消费草稿。
-    const composer = await waitForValue(
-      () => (window.location.href !== sourceUrl ? findComposer() : null),
-      { timeoutMs: 5000, intervalMs: 100 }
-    )
-    if (!composer) return
-
-    const inserted = await insertTextIntoComposer(composer, draftText)
-    if (!inserted) throw new Error('Gemini 原生分支已创建，但未能写入选区引用。')
-    await sendRuntimeMessage({ type: 'CLEAR_BRANCH_DRAFT' })
   } catch (error) {
-    await sendRuntimeMessage({ type: 'CLEAR_BRANCH_DRAFT' })
+    markBranchDiagnostic(diagnosticId, 'source.failed')
+    if (draftSaved) await sendRuntimeMessage({ type: 'CLEAR_BRANCH_DRAFT' })
     throw error
+  } finally {
+    if (geminiBranchController === controller) geminiBranchController = null
   }
 }
 
@@ -903,6 +912,9 @@ async function openSelectionInBranch(scope?: ChatGptBranchScope): Promise<void> 
     setButtonState('error', localConversation ? '先发送消息' : BRANCH_BUTTON_ERROR_LABEL)
     if (localConversation && activeActionButton) {
       activeActionButton.title = '当前分支尚未保存。先在此分支发送一条消息，再创建新的分支。'
+    }
+    if (adapter.id === 'gemini' && activeActionButton && error instanceof Error) {
+      activeActionButton.title = error.message
     }
     errorResetTimer = window.setTimeout(() => {
       errorResetTimer = null
@@ -980,6 +992,8 @@ export const branch = {
   disable(): void {
     if (!enabled) return
     enabled = false
+    geminiBranchController?.abort()
+    geminiBranchController = null
     consumeController?.abort()
     consumeController = null
     cachedNativeToolbar = null

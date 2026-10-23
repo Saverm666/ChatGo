@@ -3,7 +3,6 @@ import { hasReactAncestorKey } from '../modules/chatgpt-native-runtime.ts'
 // Captured native composer and selected-text tiles (2026-09-26).
 export const CHATGPT_NATIVE_FORM = 'form[data-chatgpt-composer]'
 export const CHATGPT_NATIVE_COMPOSER = `${CHATGPT_NATIVE_FORM} [contenteditable="true"]`
-const PREVIEW_SELECTOR = '.line-clamp-3.whitespace-pre-wrap'
 const EDITABLE_SELECTOR = 'input, textarea, [contenteditable="true"], [contenteditable="plaintext-only"]'
 
 // 会话页里的“写作块”同样是 div.ProseMirror[contenteditable="true"]，且排在真正的输入框
@@ -60,11 +59,17 @@ export function nativeComposerContainer(composer: Element): Element {
     composer
 }
 
-export function hasNativeAttachmentPreview(container: Element, id: string, markdown: string): boolean {
-  const expected = markdown.trim()
-  return Array.from(container.querySelectorAll(PREVIEW_SELECTOR)).some((element) =>
-    !element.closest(EDITABLE_SELECTOR) && visible(element) &&
-    element.textContent?.trim() === expected && hasReactAncestorKey(element, id))
+export function hasNativeAttachmentPreview(container: Element, id: string): boolean {
+  // React's attachment key identifies the exact entry we just added. Preview
+  // classes and text are presentation details: Markdown can be rendered,
+  // abbreviated, or split across several elements. Check ownership first to
+  // avoid layout/style reads for every element in a document-wide portal scan.
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT)
+  while (walker.nextNode()) {
+    const element = walker.currentNode as Element
+    if (hasReactAncestorKey(element, id) && !element.closest(EDITABLE_SELECTOR) && visible(element)) return true
+  }
+  return false
 }
 
 // Legacy targeted-reply cards have no attachment ID. The bridge checks these

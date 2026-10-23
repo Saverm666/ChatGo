@@ -1,55 +1,75 @@
 # ChatGo
 
-ChatGo 是一款 Chrome MV3 扩展，为常用 AI 聊天网站补充公式复制、Markdown 复制、提示词管理、分支提问和输入增强功能。
+English | [简体中文](README.zh-CN.md)
 
-## 支持的网站
+ChatGo is a Chrome Manifest V3 extension that adds formula copying, Markdown copying, prompt management, conversation branching, and input enhancements to popular AI chat websites.
+
+## Supported websites
 
 - [ChatGPT](https://chatgpt.com/)
 - [DeepSeek](https://chat.deepseek.com/)
 - [Gemini](https://gemini.google.com/)
-- [通义千问](https://chat.qwen.ai/)
+- [Qwen](https://chat.qwen.ai/)
 
-## 安装
+## Installation
 
-### 使用 Release 安装包
+### From a release package
 
-1. 在项目的 [Releases](https://github.com/Saverm666/ChatGo/releases) 页面下载最新版 `ChatGo-v*.zip`。
-2. 将 ZIP 完整解压到一个固定目录；请勿直接选择 ZIP 文件。
-3. 在 Chrome 地址栏打开 `chrome://extensions/`。
-4. 打开页面右上角的“开发者模式”。
-5. 点击“加载已解压的扩展程序”，选择刚才的解压目录。
-6. 安装完成后刷新已经打开的 AI 聊天页面。
+1. Download the latest `ChatGo-v*.zip` from [Releases](https://github.com/Saverm666/ChatGo/releases).
+2. Extract the entire ZIP into a permanent folder.
+3. Open `chrome://extensions/` in Chrome.
+4. Enable **Developer mode** in the upper-right corner.
+5. Click **Load unpacked** and select the extracted folder that directly contains `manifest.json`.
+6. Refresh any AI chat pages that are already open.
 
-### 从源码安装
+### From the repository — no build required
+
+The repository includes a ready-to-load `dist/` folder. You do not need Node.js or build commands to install it.
+
+1. Clone this repository, or click **Code → Download ZIP** on GitHub and extract it completely.
+2. Open `chrome://extensions/` and enable **Developer mode**.
+3. Click **Load unpacked** and select the **`dist/` folder inside the repository**:
+   - For a clone named `ChatGo`, select `ChatGo/dist/`.
+   - For a downloaded repository ZIP, this is usually `ChatGo-main/dist/`.
+4. Confirm that the selected folder directly contains `manifest.json`, then refresh your AI chat pages.
+
+**Select the folder that directly contains `manifest.json`.** For repository installations, this is `dist/`, not the repository root, `src/`, or the ZIP file. For release packages, select the extracted folder containing `manifest.json`.
+
+### After changing the source code
 
 ```bash
 pnpm install
 pnpm build
 ```
 
-然后打开 `chrome://extensions/`，开启开发者模式，点击“加载已解压的扩展程序”，选择项目中的 `dist/` 目录。
+Load the generated `dist/` folder as described above, for example `/your/path/ChatGo/dist/`. After further source changes, run `pnpm build` again and click **Reload** on the extension card in Chrome.
 
-## 使用方法
+## Usage
 
-安装后打开任一支持的网站。点击浏览器工具栏中的 ChatGo 图标可以快速调整复制格式、管理当前站点、查看提示词和公式历史；点击“打开完整设置”可管理全部功能。
+Open a supported website after installing the extension. Click the ChatGo icon in the browser toolbar to adjust copy formats, manage the current website, and access prompts and formula history. Use “打开完整设置” (Open full settings) to manage all features.
 
-- **公式点击复制**：鼠标移到公式上会显示蓝色轮廓，点击即可按设定格式复制。可选择带 `$` 的 LaTeX、纯 LaTeX 或适用于 Word 的 UnicodeMath。
-- **选区复制为 Markdown**：框选助手回复中的内容后按 `Ctrl+C`；macOS 使用 `Command+C`。列表、代码块、引用和公式会尽量保留 Markdown 结构。
-- **Enter 输入增强**：`Enter` 换行，`Ctrl+Enter` 发送消息。
-- **分支提问**：框选助手回复中的内容。在 ChatGPT 中可直接从原生选区工具条选择“对话分支”或“工作分支”；新分支优先调用页面的原生引用状态和提交函数，保留选区的 Markdown 结构；站点版本不兼容时回退为 Markdown 引用。其他站点仍使用“分支提问”按钮。
-- **对话节点导航**：ChatGPT 对话有至少两条已加载提问时，右侧显示可点击的提问节点；官方目录出现时自动隐藏。默认开启，可在功能开关中关闭。
-- **提示词与公式历史**：点击页面上的 ChatGo 悬浮按钮，可新建、搜索、复制、编辑或置顶提示词，也可再次复制最近使用过的公式。
-- **站点控制**：可在扩展弹窗或完整设置中启用、停用支持的网站，并维护白名单和黑名单。
+- **Click to copy formulas:** Hover over a formula to see a blue outline, then click to copy it in your selected format: LaTeX with `$` delimiters, plain LaTeX, or Word-compatible UnicodeMath.
+- **Copy selections as Markdown:** Select part of an assistant response and press `Ctrl+C` (`Command+C` on macOS). Lists, code blocks, quotations, and formulas retain their Markdown structure where possible.
+- **Input enhancements:** Press `Enter` for a new line and `Ctrl+Enter` to send a message.
+- **Conversation branching:** Select text in an assistant response. In ChatGPT, choose “对话分支” (Conversation branch) or “工作分支” (Work branch) from the native selection toolbar. ChatGo uses the page’s native quote state and submission functions where compatible, with a Markdown quote fallback. In Gemini, the “分支提问” (Branch question) button creates a native branch from the selected response, opens it in a new tab, and fills the composer with a Markdown quote while keeping the source conversation open. Other websites use the branch question button.
+- **Conversation navigation:** In ChatGPT conversations with at least two loaded user questions, a navigation panel appears on the right. It hides automatically when the website’s own navigation is present. This feature is enabled by default and can be disabled in settings.
+- **Prompts and formula history:** Click the floating ChatGo button to create, search, copy, edit, or pin prompts and copy recently used formulas again.
+- **Website controls:** Enable or disable supported websites and manage allowlists and blocklists from the popup or full settings page.
 
-悬浮按钮可以拖到页面上的合适位置；不需要的功能可在“完整设置 → 功能开关”中单独关闭。
+Drag the floating button to a convenient position. Individual features can be disabled under “完整设置 → 功能开关” (Full settings → Feature toggles).
 
-## 更新
+## Updating
 
-下载新版 ZIP，将内容解压并覆盖到原来的扩展目录，然后在 `chrome://extensions/` 中点击 ChatGo 卡片上的“重新加载”按钮。请保持解压目录路径不变，也不要先删除旧扩展，否则浏览器中保存的设置、提示词和公式历史可能丢失。
+For a release installation, download the new ZIP and extract it over your existing extension folder. Then click **Reload** on the ChatGo card at `chrome://extensions/`.
 
-## 开发验证
+For a repository installation, pull the latest changes or replace the repository files with the latest download. Keep the same `dist/` path, click **Reload**, and refresh your AI chat pages.
+
+Keep the installation folder in the same location and reload the existing extension instead of removing it first, so your saved settings, prompts, and formula history are preserved. See the [changelog](CHANGELOG.md) (Chinese) for detailed version changes.
+
+## Development checks
 
 ```bash
 pnpm typecheck
 pnpm build
+pnpm test
 ```

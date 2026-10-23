@@ -1,0 +1,176 @@
+{
+  "manifest_version": 3,
+  "name": "ChatGo",
+  "description": "为多家 AI 聊天站点提供公式复制、Markdown 复制、提示词收藏、对话导航、分支提问与输入增强。",
+  "version": "0.16.1",
+  "icons": {
+    "16": "src/assets/icons/icon16.png",
+    "32": "src/assets/icons/icon32.png",
+    "48": "src/assets/icons/icon48.png",
+    "128": "src/assets/icons/icon128.png"
+  },
+  "permissions": [
+    "storage",
+    "tabs"
+  ],
+  "background": {
+    "service_worker": "service-worker-loader.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "ChatGo",
+    "default_popup": "src/popup/index.html",
+    "default_icon": {
+      "16": "src/assets/icons/icon16.png",
+      "32": "src/assets/icons/icon32.png",
+      "48": "src/assets/icons/icon48.png"
+    }
+  },
+  "options_page": "src/options/index.html",
+  "web_accessible_resources": [
+    {
+      "matches": [
+        "https://chat.deepseek.com/*",
+        "https://chat.qwen.ai/*",
+        "https://chatgpt.com/*",
+        "https://gemini.google.com/*"
+      ],
+      "resources": [
+        "fonts/*",
+        "assets/KaTeX_AMS-Regular-BQhdFMY1.woff2",
+        "assets/KaTeX_AMS-Regular-DMm9YOAa.woff",
+        "assets/KaTeX_AMS-Regular-DRggAlZN.ttf",
+        "assets/KaTeX_Caligraphic-Bold-Dq_IR9rO.woff2",
+        "assets/KaTeX_Caligraphic-Bold-BEiXGLvX.woff",
+        "assets/KaTeX_Caligraphic-Bold-ATXxdsX0.ttf",
+        "assets/KaTeX_Caligraphic-Regular-Di6jR-x-.woff2",
+        "assets/KaTeX_Caligraphic-Regular-CTRA-rTL.woff",
+        "assets/KaTeX_Caligraphic-Regular-wX97UBjC.ttf",
+        "assets/KaTeX_Fraktur-Bold-CL6g_b3V.woff2",
+        "assets/KaTeX_Fraktur-Bold-BsDP51OF.woff",
+        "assets/KaTeX_Fraktur-Bold-BdnERNNW.ttf",
+        "assets/KaTeX_Fraktur-Regular-CTYiF6lA.woff2",
+        "assets/KaTeX_Fraktur-Regular-Dxdc4cR9.woff",
+        "assets/KaTeX_Fraktur-Regular-CB_wures.ttf",
+        "assets/KaTeX_Main-Bold-Cx986IdX.woff2",
+        "assets/KaTeX_Main-Bold-Jm3AIy58.woff",
+        "assets/KaTeX_Main-Bold-waoOVXN0.ttf",
+        "assets/KaTeX_Main-BoldItalic-DxDJ3AOS.woff2",
+        "assets/KaTeX_Main-BoldItalic-SpSLRI95.woff",
+        "assets/KaTeX_Main-BoldItalic-DzxPMmG6.ttf",
+        "assets/KaTeX_Main-Italic-NWA7e6Wa.woff2",
+        "assets/KaTeX_Main-Italic-BMLOBm91.woff",
+        "assets/KaTeX_Main-Italic-3WenGoN9.ttf",
+        "assets/KaTeX_Main-Regular-B22Nviop.woff2",
+        "assets/KaTeX_Main-Regular-Dr94JaBh.woff",
+        "assets/KaTeX_Main-Regular-ypZvNtVU.ttf",
+        "assets/KaTeX_Math-BoldItalic-CZnvNsCZ.woff2",
+        "assets/KaTeX_Math-BoldItalic-iY-2wyZ7.woff",
+        "assets/KaTeX_Math-BoldItalic-B3XSjfu4.ttf",
+        "assets/KaTeX_Math-Italic-t53AETM-.woff2",
+        "assets/KaTeX_Math-Italic-DA0__PXp.woff",
+        "assets/KaTeX_Math-Italic-flOr_0UB.ttf",
+        "assets/KaTeX_SansSerif-Bold-D1sUS0GD.woff2",
+        "assets/KaTeX_SansSerif-Bold-DbIhKOiC.woff",
+        "assets/KaTeX_SansSerif-Bold-CFMepnvq.ttf",
+        "assets/KaTeX_SansSerif-Italic-C3H0VqGB.woff2",
+        "assets/KaTeX_SansSerif-Italic-DN2j7dab.woff",
+        "assets/KaTeX_SansSerif-Italic-YYjJ1zSn.ttf",
+        "assets/KaTeX_SansSerif-Regular-DDBCnlJ7.woff2",
+        "assets/KaTeX_SansSerif-Regular-CS6fqUqJ.woff",
+        "assets/KaTeX_SansSerif-Regular-BNo7hRIc.ttf",
+        "assets/KaTeX_Script-Regular-D3wIWfF6.woff2",
+        "assets/KaTeX_Script-Regular-D5yQViql.woff",
+        "assets/KaTeX_Script-Regular-C5JkGWo-.ttf",
+        "assets/KaTeX_Size1-Regular-mCD8mA8B.woff2",
+        "assets/KaTeX_Size1-Regular-C195tn64.woff",
+        "assets/KaTeX_Size1-Regular-Dbsnue_I.ttf",
+        "assets/KaTeX_Size2-Regular-Dy4dx90m.woff2",
+        "assets/KaTeX_Size2-Regular-oD1tc_U0.woff",
+        "assets/KaTeX_Size2-Regular-B7gKUWhC.ttf",
+        "assets/KaTeX_Size3-Regular-CTq5MqoE.woff",
+        "assets/KaTeX_Size3-Regular-DgpXs0kz.ttf",
+        "assets/KaTeX_Size4-Regular-Dl5lxZxV.woff2",
+        "assets/KaTeX_Size4-Regular-BF-4gkZK.woff",
+        "assets/KaTeX_Size4-Regular-DWFBv043.ttf",
+        "assets/KaTeX_Typewriter-Regular-CO6r4hn1.woff2",
+        "assets/KaTeX_Typewriter-Regular-C0xS9mPB.woff",
+        "assets/KaTeX_Typewriter-Regular-D3Ib7_Hf.ttf",
+        "assets/chunk-vcISjTlQ.js",
+        "assets/chunk-0mBnFMlJ.js",
+        "assets/chunk-DfYg31eW.js",
+        "assets/chunk-CnQRH7R8.js",
+        "assets/chunk-C_QR48QD.js",
+        "assets/chunk-SczAOPc_.js",
+        "assets/chunk-D2lC3_W9.js",
+        "assets/chunk-Hj6xzS3p.js",
+        "assets/chunk-5U1eQeNJ.js",
+        "assets/chunk-s3CDdupv.js",
+        "assets/chunk-DG0pm0e9.js",
+        "assets/chunk-C_fbAli6.js",
+        "assets/chunk-UChlLmmp.js",
+        "assets/chunk-BheImr7L.js",
+        "assets/chunk-DQfvPVKZ.js",
+        "assets/chunk-BDdTFO9S.js",
+        "assets/chunk-C7z6lADb.js",
+        "assets/chunk-DQRkgoMm.js",
+        "assets/chunk-B4J1vR-A.js",
+        "assets/chunk-uLN8M5ZI.js",
+        "assets/chunk-Ro3tRIqG.js"
+      ],
+      "use_dynamic_url": false
+    },
+    {
+      "matches": [
+        "https://gemini.google.com/*"
+      ],
+      "resources": [
+        "assets/chunk-DmAhMCYL.js"
+      ],
+      "use_dynamic_url": false
+    },
+    {
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
+      "resources": [
+        "assets/chunk-C4x3uLz6.js"
+      ],
+      "use_dynamic_url": false
+    }
+  ],
+  "content_scripts": [
+    {
+      "js": [
+        "assets/chunk-DmAhMCYL.js"
+      ],
+      "matches": [
+        "https://gemini.google.com/*"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "js": [
+        "assets/chunk-C4x3uLz6.js"
+      ],
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "js": [
+        "assets/index.ts-loader-YcIjHYgS.js"
+      ],
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.deepseek.com/*",
+        "https://gemini.google.com/*",
+        "https://chat.qwen.ai/*"
+      ],
+      "run_at": "document_start"
+    }
+  ]
+}

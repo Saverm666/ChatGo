@@ -1,5 +1,6 @@
 import { BRANCH_DRAFT_TTL_MS } from '../main/constants.ts'
 import type { BranchPromptDraft } from '../main/types.ts'
+import { isGeminiBranchDestination } from '../main/gemini-route.ts'
 
 export function isFreshBranchDraft(
   draft: BranchPromptDraft | null,
@@ -69,10 +70,9 @@ export function canTabConsumeNativeGeminiDraft(
   draft: BranchPromptDraft,
   consumer: NativeBranchConsumer
 ): boolean {
-  return canTabConsumeNativeBranchDraft(draft, consumer, {
-    strategies: ['native-gemini'],
-    hostname: 'gemini.google.com'
-  })
+  return draft.strategy === 'native-gemini' && consumer.tabId !== draft.sourceTabId &&
+    canTabConsumeBranchDraft(draft, consumer.tabId) &&
+    isGeminiBranchDestination(draft.sourceUrl, consumer.url ?? '')
 }
 
 export function canTabConsumeNativeChatGptDraft(

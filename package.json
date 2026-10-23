@@ -1,6 +1,6 @@
 {
   "name": "chatgo",
-  "version": "0.15.1",
+  "version": "0.16.1",
   "private": true,
   "type": "module",
   "description": "ChatGo - 普适化 AI 聊天站点效率增强的 Chrome 扩展",

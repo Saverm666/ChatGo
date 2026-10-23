@@ -1,11 +1,11 @@
 # Dependencies and build output
 node_modules/
-dist/
 release/
 .vite/
 coverage/
 
 # Logs and local tooling state
+scripts/
 *.log
 *.pid
 .DS_Store

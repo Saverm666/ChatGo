@@ -6,6 +6,9 @@ import { shouldEnableForSite } from '@/main/site-policy'
 import { resolveAdapter } from './sites'
 import { readSettings, onStorageChanged, isExtensionContextInvalidatedError } from '@/main/storage'
 import { CONTENT_MODULE_SETTING_KEYS, contentFeatureModules } from './modules/registry'
+import { initializeBranchDiagnostics, markBranchStartup } from './modules/branch-diagnostics'
+
+initializeBranchDiagnostics()
 
 let currentAdapter: SiteAdapter | null = null
 let settingsSyncGeneration = 0
@@ -32,11 +35,14 @@ function applySettings(settings: ChatGoSettings, adapter: SiteAdapter): void {
 }
 
 async function syncSettings(): Promise<void> {
+  markBranchStartup('page.settings-read-start')
   const generation = ++settingsSyncGeneration
   const settings = await readSettings()
+  markBranchStartup('page.settings-read-end')
   if (generation !== settingsSyncGeneration) return
   const adapter = resolveAdapter(new URL(window.location.href))
   applySettings(settings, adapter)
+  markBranchStartup('page.modules-applied')
 }
 
 // 监听设置变化

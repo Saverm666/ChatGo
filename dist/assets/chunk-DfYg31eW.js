@@ -1,0 +1,1 @@
+function c(a,r){try{const n=new URL(a),e=new URL(r);if(n.origin!=="https://gemini.google.com"||e.origin!==n.origin)return!1;const i=/^(\/u\/\d+)?\/app\/([^/]+)\/?$/,t=n.pathname.match(i),o=e.pathname.match(i);return!!(t&&o&&(t[1]??"")===(o[1]??"")&&t[2]!==o[2])}catch{return!1}}export{c as i};

@@ -39,7 +39,7 @@ test('rejects expired branch drafts', () => {
   assert.equal(isFreshBranchDraft(createDraft(), now + BRANCH_DRAFT_TTL_MS), false)
 })
 
-test('allows a native Gemini branch only after it reaches a different chat URL', () => {
+test('Gemini drafts never fill the source tab, even after a route change', () => {
   const draft = createDraft({
     strategy: 'native-gemini',
     sourceUrl: 'https://gemini.google.com/app/source-chat',
@@ -50,7 +50,7 @@ test('allows a native Gemini branch only after it reaches a different chat URL',
       tabId: 12,
       url: 'https://gemini.google.com/app/branched-chat'
     }),
-    true
+    false
   )
   assert.equal(
     canTabConsumeNativeGeminiDraft(draft, {
@@ -61,11 +61,12 @@ test('allows a native Gemini branch only after it reaches a different chat URL',
   )
 })
 
-test('allows a native Gemini branch opened by the source tab but rejects unrelated tabs and origins', () => {
+test('only the bound Gemini target tab can consume the draft on a different chat URL', () => {
   const draft = createDraft({
     strategy: 'native-gemini',
     sourceUrl: 'https://gemini.google.com/app/source-chat',
-    sourcePath: '/app/source-chat'
+    sourcePath: '/app/source-chat',
+    targetTabId: 34
   })
   assert.equal(
     canTabConsumeNativeGeminiDraft(draft, {
@@ -77,7 +78,7 @@ test('allows a native Gemini branch opened by the source tab but rejects unrelat
   )
   assert.equal(
     canTabConsumeNativeGeminiDraft(draft, {
-      tabId: 34,
+      tabId: 35,
       openerTabId: 99,
       url: 'https://gemini.google.com/app/branched-chat'
     }),

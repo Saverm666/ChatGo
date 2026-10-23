@@ -1,23 +1,41 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  isGeminiBranchActionLabel,
-  isGeminiMoreOptionsLabel
-} from './gemini-native-branch.ts'
+import { buildGeminiBranchRequest, geminiBranchUrlFromResponse } from './gemini-branch-api.ts'
 
-test('recognizes Gemini response menu labels in supported languages', () => {
-  assert.equal(isGeminiMoreOptionsLabel('Show more options'), true)
-  assert.equal(isGeminiMoreOptionsLabel('显示更多选项'), true)
-  assert.equal(isGeminiMoreOptionsLabel('更多選項'), true)
-  assert.equal(isGeminiMoreOptionsLabel('Upload & tools'), false)
+const page = 'https://gemini.google.com/u/1/app/source?hl=zh'
+const source = { conversationId: 'c_source', turnId: 'r_selected' }
+const frame = (id: string, rpc = 'KDNZr') => JSON.stringify([['wrb.fr', rpc, JSON.stringify([[id, 'Title']]), null]])
+
+test('builds the captured BranchConversation RPC with the selected turn and current account', () => {
+  const request = buildGeminiBranchRequest(source, page, { SNlM0e: 'test-token', cfb2h: 'test-build', FdrFJe: 'test-session' })
+  const url = new URL(request.url)
+  assert.equal(url.origin, 'https://gemini.google.com')
+  assert.equal(url.pathname, '/_/BardChatUi/data/batchexecute')
+  assert.equal(url.searchParams.get('rpcids'), 'KDNZr')
+  assert.equal(url.searchParams.get('authuser'), '1')
+  assert.equal(url.searchParams.get('source-path'), '/u/1/app/source')
+  const batch = JSON.parse(request.body.get('f.req')!)
+  assert.deepEqual(JSON.parse(batch[0][0][1]), ['c_source', 'r_selected'])
+  assert.equal(request.body.get('at'), 'test-token')
 })
 
-test('recognizes Gemini native branch actions without matching unrelated menu items', () => {
-  assert.equal(isGeminiBranchActionLabel('Branch in a new chat'), true)
-  assert.equal(isGeminiBranchActionLabel('Branch in new chat'), true)
-  assert.equal(isGeminiBranchActionLabel('Branch to new chat'), true)
-  assert.equal(isGeminiBranchActionLabel('在新对话中创建分支'), true)
-  assert.equal(isGeminiBranchActionLabel('在新聊天中创建分支'), true)
-  assert.equal(isGeminiBranchActionLabel('Report legal issue'), false)
-  assert.equal(isGeminiBranchActionLabel('See response details'), false)
+test('refuses wrong source IDs, absent credentials and foreign RPC origins', () => {
+  assert.throws(() => buildGeminiBranchRequest({ ...source, conversationId: 'c_other' }, page, { SNlM0e: 'test-token' }))
+  assert.throws(() => buildGeminiBranchRequest(source, page, {}))
+  assert.throws(() => buildGeminiBranchRequest(source, page, { SNlM0e: 'test-token', eptZe: 'https://example.com/' }))
+})
+
+test('decodes XSSI/length-prefixed frames and preserves the account in the new URL', () => {
+  const text = frame('c_new')
+  assert.equal(geminiBranchUrlFromResponse(")]}'\n\n" + text.length + '\n' + text + '\n', page),
+    'https://gemini.google.com/u/1/app/new')
+  assert.equal(geminiBranchUrlFromResponse(frame('c_other', 'unrelated') + '\n' + text, page),
+    'https://gemini.google.com/u/1/app/new')
+})
+
+test('never guesses a branch URL from source IDs, errors, or unrelated RPC results', () => {
+  for (const text of [frame('c_source'), frame('c_new', 'unrelated'), frame('https://example.com'),
+    JSON.stringify([['er', 'KDNZr', 403, 'c_new']]), '<html>login required</html>']) {
+    assert.throws(() => geminiBranchUrlFromResponse(text, page))
+  }
 })

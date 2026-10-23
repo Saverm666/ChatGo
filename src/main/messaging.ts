@@ -4,6 +4,7 @@ import { isExtensionContextInvalidatedError } from './storage'
 
 // 消息类型
 export type RuntimeMessage =
+  | { type: 'BRANCH_DIAGNOSTIC'; action: 'start' | 'stop' | 'report' | 'event'; event?: { id: string; stage: string; at: number; duration?: number } }
   | { type: 'OPEN_OPTIONS_PAGE' }
   | {
       type: 'CREATE_BRANCH_DRAFT'

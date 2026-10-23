@@ -1,0 +1,1 @@
+import{i as s}from"./chunk-0mBnFMlJ.js";async function n(e){try{return await chrome.runtime.sendMessage(e)??{ok:!1,error:"无响应"}}catch(r){return s(r)?{ok:!1,error:"扩展上下文已失效，请刷新页面。"}:{ok:!1,error:r instanceof Error?r.message:"扩展通信失败。"}}}export{n as s};

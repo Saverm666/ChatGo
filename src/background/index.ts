@@ -4,6 +4,7 @@
 import { DEFAULT_SETTINGS, STORAGE_KEYS } from '@/main/constants'
 import type { BranchPromptDraft } from '@/main/types'
 import { isExtensionContextInvalidatedError } from '@/main/storage'
+import { handleBranchDiagnostic } from './branch-diagnostics'
 import {
   canTabConsumeBranchDraft,
   canTabConsumeNativeChatGptDraft,
@@ -25,6 +26,13 @@ chrome.runtime.onInstalled.addListener(async () => {
 
 // 消息处理
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === 'BRANCH_DIAGNOSTIC') {
+    if (!sender.tab?.url || new URL(sender.tab.url).hostname !== 'gemini.google.com') return false
+    handleBranchDiagnostic(message, sender.tab.id)
+      .then(data => sendResponse({ ok: true, data }))
+      .catch(() => sendResponse({ ok: false, error: '诊断记录读写失败。' }))
+    return true
+  }
   // 打开设置页
   if (message?.type === 'OPEN_OPTIONS_PAGE') {
     chrome.tabs
@@ -85,18 +93,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           throw new Error('没有可绑定到当前页面的分支草稿。')
         }
 
+        const mark = (stage: string) => {
+          if (draft.diagnosticId) void handleBranchDiagnostic({ type: 'BRANCH_DIAGNOSTIC', action: 'event',
+            event: { id: draft.diagnosticId, stage, at: Date.now() } }, sourceTabId).catch(() => undefined)
+        }
+        mark('background.create-tab-start')
+
         const tab = await chrome.tabs.create({
           url: 'about:blank',
           openerTabId: sourceTabId,
           active: false
         })
         if (typeof tab.id !== 'number') throw new Error('无法识别新建的分支标签页。')
+        mark('background.create-tab-end')
 
         try {
           await chrome.storage.local.set({
             [STORAGE_KEYS.BRANCH_DRAFT]: { ...draft, targetTabId: tab.id }
           })
+          mark('background.draft-bound')
           await chrome.tabs.update(tab.id, { url: targetUrl.href, active: true })
+          mark('background.navigation-dispatched')
           sendResponse({ ok: true, data: { tabId: tab.id } })
         } catch (error) {
           await clearBranchDraft()
@@ -132,7 +149,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         const currentTabId = sender.tab?.id
         if (
-          canTabConsumeBranchDraft(draft, currentTabId) ||
+          (draft.strategy !== 'native-gemini' && canTabConsumeBranchDraft(draft, currentTabId)) ||
           canTabConsumeNativeGeminiDraft(draft, {
             tabId: currentTabId,
             openerTabId: sender.tab?.openerTabId,

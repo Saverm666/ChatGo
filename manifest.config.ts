@@ -42,6 +42,12 @@ export default defineManifest({
   ],
   content_scripts: [
     {
+      matches: ['https://gemini.google.com/*'],
+      js: ['src/content/gemini-native-bridge.ts'],
+      run_at: 'document_start',
+      world: 'MAIN'
+    },
+    {
       matches: ['https://chatgpt.com/*'],
       js: ['src/content/chatgpt-native-bridge.ts'],
       run_at: 'document_start',

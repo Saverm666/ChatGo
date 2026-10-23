@@ -1,0 +1,1 @@
+import{k as e}from"./chunk-uLN8M5ZI.js";function n(r){if(!r)return"";try{return e.renderToString(r,{displayMode:!0,throwOnError:!1,output:"html"})}catch{return t(r)}}function t(r){return r.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}export{n as renderFormulaPreview};
