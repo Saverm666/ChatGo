@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ChatGo",
   "description": "为多家 AI 聊天站点提供公式复制、Markdown 复制、提示词收藏、对话导航、分支提问与输入增强。",
-  "version": "0.16.1",
+  "version": "0.16.2",
   "icons": {
     "16": "src/assets/icons/icon16.png",
     "32": "src/assets/icons/icon32.png",
@@ -134,7 +134,7 @@
         "https://chatgpt.com/*"
       ],
       "resources": [
-        "assets/chunk-C4x3uLz6.js"
+        "assets/chunk-CbXBdLLN.js"
       ],
       "use_dynamic_url": false
     }
@@ -152,7 +152,7 @@
     },
     {
       "js": [
-        "assets/chunk-C4x3uLz6.js"
+        "assets/chunk-CbXBdLLN.js"
       ],
       "matches": [
         "https://chatgpt.com/*"

@@ -6,6 +6,8 @@ coverage/
 
 # Logs and local tooling state
 scripts/
+__pycache__/
+*.py[cod]
 *.log
 *.pid
 .DS_Store

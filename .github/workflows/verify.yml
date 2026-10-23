@@ -1,0 +1,54 @@
+name: Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Check dependency notices
+        run: |
+          pnpm licenses:collect
+          git diff --exit-code -- THIRD_PARTY_NOTICES.md public/LICENSE public/THIRD_PARTY_NOTICES.txt
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - name: Check committed distribution
+        run: |
+          git diff --exit-code -- dist
+          test -z "$(git ls-files --others --exclude-standard dist)"
+      - name: Install browser test dependencies
+        run: |
+          python3 -m pip install -r tests/requirements.txt
+          python3 -m playwright install --with-deps chromium
+      - run: pnpm test:runtime
+      - run: pnpm test:release
+      - run: pnpm release:check
+      - run: pnpm release:pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chatgo-verified-package
+          path: |
+            release/ChatGo-v*.zip
+            release/ChatGo-v*.zip.sha256
+          if-no-files-found: error

@@ -73,3 +73,9 @@ pnpm typecheck
 pnpm build
 pnpm test
 ```
+
+For browser regressions, release validation, and manual acceptance criteria, see the [test plan](docs/TESTING.md). See the [release history](docs/RELEASES.md) for verification records and the [maintenance plan](docs/MAINTENANCE.md) for release gates, upkeep and incident handling.
+
+## License
+
+ChatGo is licensed under the [MIT License](LICENSE), retaining the original ChatGPT-Voyager notice. Dependencies and fonts retain their own terms; see [third-party notices](THIRD_PARTY_NOTICES.md). The extension ZIP includes the project license, dependency notices and font licenses.
