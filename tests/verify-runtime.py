@@ -135,7 +135,7 @@ def run(browser, output):
                   'Gemini diagnostics: source and MAIN timings are correlated without extra RPC calls')
             check('fixture-token' not in json.dumps(result['diagnostics']) and 'Selected' not in json.dumps(result['diagnostics']),
                   'Gemini diagnostics: records no credentials or selected content')
-            page.add_script_tag(path=str(ROOT / 'scripts/diagnose-gemini-branch.js'))
+            page.add_script_tag(path=str(ROOT / 'tools/diagnose-gemini-branch.js'))
             page.wait_for_function('Boolean(window.chatgoBranchDiagnostic)')
             report = page.evaluate('chatgoBranchDiagnostic.report()')
             check(any(row['phase'] == '接口等待（网络与服务器）' for row in report['summary']),

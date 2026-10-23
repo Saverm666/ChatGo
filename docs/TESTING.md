@@ -35,7 +35,7 @@ Replace the version in the checksum filename with the version being tested. On W
 | Release tool regressions | `pnpm test:release` reports zero failures | Missing resource, wrong version, stale notices, incorrect MAIN loader rejection and repeatable ZIP/checksum |
 | Package check | ZIP matches every `dist/` byte; checksum verifies | Root-level manifest, complete contents, integrity and SHA-256 |
 
-`tests/verify-runtime.py` is tracked and runs without real accounts or external site traffic. An optional local Gemini HTML snapshot adds a case when present; the core suite does not depend on it. `scripts/` remains ignored for local tools.
+`tests/verify-runtime.py` is tracked and runs without real accounts or external site traffic. An optional local Gemini HTML snapshot adds a case when present; the core suite does not depend on it. The diagnostic console helper is tracked at `tools/diagnose-gemini-branch.js`; `scripts/` remains ignored for local tools. Run browser regressions from a tracked-files-only checkout before release so ignored working-directory files cannot hide missing dependencies.
 
 The Verify GitHub Actions workflow runs on main pushes, pull requests, manual dispatch and Mondays at **10:00 Asia/Shanghai**. It also compares rebuilt `dist/` and license notices against Git and uploads a verified ZIP and checksum. Local results do not establish that hosted CI passed: link the actual Actions run in the release record.
 
