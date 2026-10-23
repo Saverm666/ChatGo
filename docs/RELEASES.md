@@ -4,7 +4,7 @@ Dates below use Asia/Shanghai. GitHub timestamps may display August 30 in UTC fo
 
 | Version | Date | Release record | Verification |
 | --- | --- | --- | --- |
-| [0.16.3](https://github.com/Saverm666/ChatGo/releases/tag/v0.16.3) | 2026-10-23 | [Detailed record](releases/v0.16.3.md) | Fix for missing tracked diagnostic helper; see record for hosted evidence |
+| [0.16.3](https://github.com/Saverm666/ChatGo/releases/tag/v0.16.3) | 2026-10-23 | [Detailed record](releases/v0.16.3.md) | **Hosted CI passed**: [39924062874](https://github.com/Saverm666/ChatGo/actions/runs/39924062874), commit `ac14a5b`; fixes the missing helper |
 | [0.16.2](https://github.com/Saverm666/ChatGo/releases/tag/v0.16.2) | 2026-10-23 | [Detailed record](releases/v0.16.2.md) | Local checks passed; **hosted CI failed**: [39923394124](https://github.com/Saverm666/ChatGo/actions/runs/39923394124); corrected in 0.16.3 |
 | [0.16.1](https://github.com/Saverm666/ChatGo/releases/tag/v0.16.1) | 2026-10-23 | [Detailed record](releases/v0.16.1.md) | 112 unit tests, local browser regressions and packaging checks passed; live-account checks not run |
 | [0.7.10](https://github.com/Saverm666/ChatGo/releases/tag/v0.7.10) | 2026-08-31 | ZIP-only installation instructions and a published checksum | No retained automated or manual test log |
