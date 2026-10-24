@@ -209,8 +209,9 @@ function injectStyles(): void {
   const style = document.createElement('style')
   style.id = 'chatgo-formula-copier-styles'
   style.textContent = `
-    .chatgo-formula-hover { outline: 2px solid #3B82F6 !important; outline-offset: 2px; cursor: pointer; }
-    .chatgo-formula-selected { outline: 2px solid #0A0A0A !important; outline-offset: 2px; }
+    /* 将边框画在元素内部，避免被公式的 overflow 滚动容器裁掉左右两侧。 */
+    .chatgo-formula-hover { outline: 2px solid #3B82F6 !important; outline-offset: -2px !important; cursor: pointer; }
+    .chatgo-formula-selected { outline: 2px solid #0A0A0A !important; outline-offset: -2px !important; }
     .chatgo-formula-feedback {
       position: fixed; z-index: 2147483647; padding: 6px 12px; border-radius: 8px;
       background: #0A0A0A; color: #FFFFFF; font-size: 13px; font-family: system-ui, sans-serif;

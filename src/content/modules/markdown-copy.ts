@@ -24,7 +24,7 @@ function isEditableTarget(node: Node | null): boolean {
   const el = getElementFromNode(node)
   if (!el) return false
   return Boolean(
-    el.closest("input, textarea, [contenteditable='true'], [contenteditable='plaintext-only']")
+    el.closest('input, textarea') || (el instanceof HTMLElement && el.isContentEditable)
   )
 }
 
@@ -182,14 +182,16 @@ function onKeyDown(event: KeyboardEvent): void {
 }
 
 function onCopy(event: ClipboardEvent): void {
-  if (!enabled) return
+  if (!enabled || !event.clipboardData) return
   if (isCopyControlEvent(event)) return
-  const markdown = getSelectionMarkdown() || lastCopyPayload
+  // 写作块和输入框交给浏览器 / 编辑器复制；不能用旧内容覆盖本次选区。
+  if (event.composedPath().some((item) => item instanceof Node && isEditableTarget(item))) return
+  const markdown = getSelectionMarkdown()
   if (!markdown) return
+  event.clipboardData.setData('text/plain', markdown)
   lastCopyPayload = markdown
   event.preventDefault()
   event.stopImmediatePropagation()
-  event.clipboardData?.setData('text/plain', markdown)
 }
 
 export const markdownCopy = {

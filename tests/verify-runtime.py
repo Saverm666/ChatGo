@@ -190,6 +190,56 @@ def run(browser, output):
     check('10.' not in result['partial'] and '11.' in result['partial'] and result['clean'], 'partial list selection and DOM restoration preserved')
     page.close()
 
+    page = new_page(browser, '''<main><p id="answer"><strong>Previous answer</strong></p>
+        <div data-testid="chatgpt-writing-block"><div data-oai-writing-block-surface>
+        <div id="writing" contenteditable="true"><p>Writing block text</p></div>
+        </div></div><input id="input" value="Input text"><textarea id="textarea">Draft text</textarea>
+        <div id="empty-editable" contenteditable>Editable text</div></main>''')
+    load(page, output, 'copy', 'adapter')
+    result = page.evaluate(r'''()=>{
+      copyTest.enable(adapterTest);
+      const select=selector=>{const el=document.querySelector(selector);el.focus();
+        const r=document.createRange();r.selectNodeContents(el);
+        getSelection().removeAllRanges();getSelection().addRange(r);return el};
+      const copy=target=>{const data=new DataTransfer();
+        const e=new ClipboardEvent('copy',{bubbles:true,cancelable:true,clipboardData:data});
+        target.dispatchEvent(e);return {prevented:e.defaultPrevented,text:data.getData('text/plain')}};
+      const answer=copy(select('#answer'));
+      let nativeCopies=0;
+      document.querySelector('#writing').addEventListener('copy',()=>nativeCopies++);
+      const writing=copy(select('#writing'));
+      const emptyEditable=copy(select('#empty-editable'));
+      const fields=['#input','#textarea'].map(selector=>{
+        const el=document.querySelector(selector);el.focus();el.select();return copy(el)});
+      // An editable event must stay native even if the DOM selection is stale elsewhere.
+      select('#answer');const staleSelection=copy(document.querySelector('#input'));
+      getSelection().removeAllRanges();const noSelection=copy(document.body);
+      select('#answer');const noClipboard=new ClipboardEvent('copy',{bubbles:true,cancelable:true});
+      document.querySelector('#answer').dispatchEvent(noClipboard);
+      return {answer,writing,emptyEditable,fields,staleSelection,noSelection,nativeCopies,
+        noClipboardPrevented:noClipboard.defaultPrevented};
+    }''')
+    check(result['answer'] == {'prevented': True, 'text': '**Previous answer**'},
+          'copy event still converts answer selections to Markdown')
+    check(result['writing'] == {'prevented': False, 'text': ''} and result['nativeCopies'] == 1,
+          'writing-block copy reaches the native editor after copying an answer')
+    check(all(not row['prevented'] and not row['text'] for row in
+              [result['emptyEditable'], *result['fields'], result['staleSelection'], result['noSelection']]),
+          'editable controls and empty selections never reuse the previous copy payload')
+    check(not result['noClipboardPrevented'], 'copy without clipboard access preserves default behavior')
+    page.context.grant_permissions(['clipboard-read', 'clipboard-write'])
+    for method in ['keyboard', 'copy-command']:
+        page.evaluate('''()=>{const el=document.querySelector('#writing');el.focus();
+          const r=document.createRange();r.selectNodeContents(el);
+          getSelection().removeAllRanges();getSelection().addRange(r)}''')
+        if method == 'keyboard':
+            page.keyboard.press('Control+c')
+        else:
+            page.evaluate("document.execCommand('copy')")
+        check(page.evaluate('navigator.clipboard.readText()') == 'Writing block text',
+              'writing-block ' + method + ': system clipboard contains the current selection')
+    page.close()
+
     # Exercise actual fetch -> ESM import -> runtime cache discovery. Earlier
     # tests inject the API and cannot detect failures in this loading path.
     for scenario in ['late-runtime', 'failed-import', 'stalled-asset', 'stalled-import', 'late-composer-module']:

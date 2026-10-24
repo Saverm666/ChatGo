@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ChatGo",
   "description": "为多家 AI 聊天站点提供公式复制、Markdown 复制、提示词收藏、对话导航、分支提问与输入增强。",
-  "version": "0.16.3",
+  "version": "0.16.5",
   "icons": {
     "16": "src/assets/icons/icon16.png",
     "32": "src/assets/icons/icon32.png",
@@ -103,17 +103,17 @@
         "assets/chunk-C_QR48QD.js",
         "assets/chunk-SczAOPc_.js",
         "assets/chunk-D2lC3_W9.js",
-        "assets/chunk-Hj6xzS3p.js",
+        "assets/chunk-lZiJJzd3.js",
         "assets/chunk-5U1eQeNJ.js",
         "assets/chunk-s3CDdupv.js",
         "assets/chunk-DG0pm0e9.js",
         "assets/chunk-C_fbAli6.js",
         "assets/chunk-UChlLmmp.js",
-        "assets/chunk-BheImr7L.js",
+        "assets/chunk-BYescosr.js",
         "assets/chunk-DQfvPVKZ.js",
         "assets/chunk-BDdTFO9S.js",
         "assets/chunk-C7z6lADb.js",
-        "assets/chunk-DQRkgoMm.js",
+        "assets/chunk-D5EDNqxn.js",
         "assets/chunk-B4J1vR-A.js",
         "assets/chunk-uLN8M5ZI.js",
         "assets/chunk-Ro3tRIqG.js"
@@ -134,7 +134,7 @@
         "https://chatgpt.com/*"
       ],
       "resources": [
-        "assets/chunk-B2t166GN.js"
+        "assets/chunk-DapdtI8b.js"
       ],
       "use_dynamic_url": false
     }
@@ -152,7 +152,7 @@
     },
     {
       "js": [
-        "assets/chunk-B2t166GN.js"
+        "assets/chunk-DapdtI8b.js"
       ],
       "matches": [
         "https://chatgpt.com/*"
@@ -162,7 +162,7 @@
     },
     {
       "js": [
-        "assets/index.ts-loader-YcIjHYgS.js"
+        "assets/index.ts-loader-i9DJmS2x.js"
       ],
       "matches": [
         "https://chatgpt.com/*",
